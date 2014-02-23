@@ -1,0 +1,4 @@
+Comments comming soon for code
+Requires: freenect, simplecv, opencv
+Make sure to run glview to load the kinect freenect drivers before running the code
+
