@@ -145,17 +145,20 @@ class View:
                 self.head.z + 1,
 
                 # what we're looking at
-                math.sin(self.head.xangle) * distance,
-                math.sin(self.head.yangle) * distance,
-                distance - 1,
+                #math.sin(self.head.xangle) * distance,
+                #math.sin(self.head.yangle) * distance,
+                #distance - 1,
+
+                #0,
+                #0,
+                #distance - 1,
 
                 # the up vector in the final view.
                 0, 1, 0
                 )
 
-        self.draw_view()
-
         glMatrixMode(GL_PROJECTION)
+        self.draw_view()
         glPopMatrix()
 
 
