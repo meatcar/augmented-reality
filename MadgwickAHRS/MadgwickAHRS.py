@@ -111,10 +111,10 @@ class MadgwickAHRS:
         qDot4 = 0.5 * (q1 * gz + q2 * gy - q3 * gx)     - self.beta * s4;
         
         # Integrate to yield quaternion
-        q1 += qDot1 * self.period;
-        q2 += qDot2 * self.period;
-        q3 += qDot3 * self.period;
-        q4 += qDot4 * self.period;
+        q1 += qDot1 * (1/self.period);
+        q2 += qDot2 * (1/self.period);
+        q3 += qDot3 * (1/self.period);
+        q4 += qDot4 * (1/self.period);
         
         norm = 1.0 / math.sqrt(q1 * q1 + q2 * q2 + q3 * q3 + q4 * q4)   # normalise quaternion
         self.Quaternion[0] = q1 * norm;

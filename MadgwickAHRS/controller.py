@@ -131,12 +131,12 @@ class Controller(object):
                 )
         
                 x, y, z = self.ahrs.getEulerAngles()
-                self.x += x
-                self.y += y
-                self.z += z
+                self.x = x
+                self.y = y
+                self.z = z
                 if self.prev != data[3]:
                     print ("")
-                    print(self.x % 6.28, self.y % 6.28, self.z % 2*3.14)
+                    print(self.x , self.y , self.z)
                     #print (self.ahrs.quatern2rotMat())
                     print (data)
                     print ("")
