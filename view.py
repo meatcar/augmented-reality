@@ -69,7 +69,7 @@ class View:
         self.draw()
 
     def draw(self):
-        glViewport(0, 0, self.width, self.height)
+        glViewport(0, 0, self.width//2, self.height)
 
         glClearDepth(1) # just for completeness
         glClearColor(0,0,0,0)
@@ -78,6 +78,7 @@ class View:
         glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST)
 
         self.draw_camera(-1)
+        glViewport(self.width//2, 0, self.width//2, self.height)
         self.draw_camera(1)
 
         # This implies a glFinish, which includes a glFlush
@@ -100,7 +101,6 @@ class View:
         glLoadIdentity()
 
         glScalef(0.5, 1, 1)
-        glTranslatef(offset, 0, 0)
 
         #turn everything into centimeters..
         glScalef(screen_ratio, 1, 1)
