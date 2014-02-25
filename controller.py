@@ -128,7 +128,7 @@ class Controller(object):
             self.spatial.setOnSpatialDataHandler(imu_handlers.on_data)
 
             self.spatial.openPhidget()
-            self.spatial.waitForAttach(1)
+            self.spatial.waitForAttach(1000)
             self.spatial.setDataRate(4)
         except:
             print("Error connecting to IMU, I cannot handle this. " + \
@@ -202,6 +202,7 @@ class Controller(object):
         """
 
         samplePeriod = 1/256.0
+        samplePeriod = 1/1000.0
 
         # number of observations.
         N = len(acc)
@@ -215,7 +216,7 @@ class Controller(object):
         ql = QuaternionLibrary()
 
         for i in range(0, N):
-            ahrs.UpdateIMU(np.array(gyr[i])*(np.pi/100), acc[i], ql.quaternProd)
+            ahrs.UpdateIMU(np.array(gyr[i])*(np.pi/180), acc[i], ql.quaternProd)
             rotation_matrices.append(ql.quatern2rotMat(ahrs.Quaternion))
 
         # compute the tilt compensated acceleration.
@@ -299,8 +300,8 @@ class Controller(object):
 
         for i in range(N-1, N):
             x = linPosHP[i][0]
-            y = linPosHP[i][0]
-            z = linPosHP[i][0]
+            y = linPosHP[i][1]
+            z = linPosHP[i][2]
 
             # update the position with respect to the
             # previously computed positions
@@ -348,7 +349,12 @@ class Controller(object):
         #self.head.zangle = np.dot([o_uz, o_vz, o_wz], [f_uz, f_vz, f_wz])
         #self.head.zangle = np.arccos(self.head.zangle)
 
-        self.head.xangle, self.head.yangle, self.head.zangle = self.euler_from_matrix(rotation_matrices[N-1])
+        
+        x, y, z = self.euler_from_matrix(rotation_matrices[N-1])
+        self.head.xangle += x
+        self.head.yangle += y
+        self.head.zangle += z
+        #self.head.xangle, self.head.yangle, self.head.zangle = self.euler_from_matrix(rotation_matrices[N-1])
         self.head.rot_matrix = rotation_matrices[N-1]
 
     def update_head(self):
@@ -371,4 +377,4 @@ c = Controller(h)
 
 while True:
     time.sleep(1)
-    print h
+    print(h)
