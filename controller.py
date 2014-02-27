@@ -202,7 +202,7 @@ class Controller(object):
         """
 
         samplePeriod = 1/256.0
-        samplePeriod = 1/1000.0
+        #samplePeriod = 4/1000.0
 
         # number of observations.
         N = len(acc)
@@ -305,9 +305,9 @@ class Controller(object):
 
             # update the position with respect to the
             # previously computed positions
-            self.head.x += x
-            self.head.y += y
-            self.head.z += z
+            #self.head.x += x
+            #self.head.y += y
+            #self.head.z += z
 
         # original velocity vectors
         o_ux = rotation_matrices[0][0,0]
@@ -371,10 +371,10 @@ class Controller(object):
                 self.process_data(data[0], data[1], data[2])
 
 
-
-h = Head()
-c = Controller(h)
-
-while True:
-    time.sleep(1)
-    print(h)
+if __name__ == "__main__":
+    h = Head()
+    c = Controller(h)
+    
+    while True:
+        time.sleep(1)
+        print(h)

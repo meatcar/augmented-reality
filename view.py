@@ -69,6 +69,7 @@ class View:
         self.draw()
 
     def draw(self):
+
         glViewport(0, 0, self.width//2, self.height)
 
         glClearDepth(1) # just for completeness
@@ -105,30 +106,6 @@ class View:
         #turn everything into centimeters..
         glScalef(screen_ratio, 1, 1)
 
-        #ux = self.head.rot_matrix[0,0]
-        #vx = self.head.rot_matrix[1,0]
-        #wx = self.head.rot_matrix[2,0]
-
-        #uy = self.head.rot_matrix[0,1]
-        #vy = self.head.rot_matrix[1,1]
-        #wy = self.head.rot_matrix[2,1]
-
-        #uz = self.head.rot_matrix[0,2]
-        #vz = self.head.rot_matrix[1,2]
-        #wz = self.head.rot_matrix[2,2]
-
-        #print("[\n\t(x) %g,%g,%g\n\t(y) %g,%g,%g\n\t(z) %g,%g,%g\n]\n" % (
-            #ux,
-            #vx,
-            #wx,
-            #uy,
-            #vy,
-            #wy,
-            #uz,
-            #vz,
-            #wz
-            #))
-
         # cut of from z=-1 to z=-1000
         gluPerspective(self.head.fov, screen_ratio, 0.02, 1000)
         gluLookAt(
@@ -145,20 +122,21 @@ class View:
                 self.head.z + 1,
 
                 # what we're looking at
-                #math.sin(self.head.xangle) * distance,
-                #math.sin(self.head.yangle) * distance,
-                #distance - 1,
+                math.sin(self.head.xangle)*math.cos(self.head.zangle*-1)*distance*distance,
+                math.cos(self.head.zangle*1)*math.sin(self.head.zangle*1)*distance*distance,
+                math.sin(self.head.xangle)*distance - 1,
 
-                #0,
-                #0,
-                #distance - 1,
+                #math.sin(self.head.xangle)*distance,
+                #-1*math.sin(self.head.yangle)*math.cos(self.head.xangle)*distance,
+                #-1*math.cos(self.head.yangle)*math.cos(self.head.xangle)*distance - 1,
 
                 # the up vector in the final view.
                 0, 1, 0
                 )
 
-        glMatrixMode(GL_PROJECTION)
         self.draw_view()
+
+        glMatrixMode(GL_PROJECTION)
         glPopMatrix()
 
 
