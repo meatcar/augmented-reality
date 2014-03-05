@@ -42,14 +42,15 @@ class Controller(object):
     _NEXT_AXIS = [1, 2, 0, 1]
     _EPS = np.finfo(float).eps * 4.0
 
-    # stores acceleration, angular change and time delta.
-    imu_measurements = ([], [], [])
-
     def __init__(self, head):
         """
 
         """
         self.phidget = PhidgetWrapper(self.on_data)
+
+        # stores acceleration, angular change and time delta.
+        self.imu_measurements = ([], [], [])
+
 
         # head contains reference to object that is updated on every
         # update from the IMU.
@@ -60,9 +61,9 @@ class Controller(object):
         self.t.start()
 
     def on_data(self, acc, agr, microseconds):
-        Controller.imu_measurements[0].append(acc)
-        Controller.imu_measurements[1].append(agr)
-        Controller.imu_measurements[2].append(microseconds)
+        self.imu_measurements[0].append(acc)
+        self.imu_measurements[1].append(agr)
+        self.imu_measurements[2].append(microseconds)
 
     def euler_from_matrix(self, matrix, axes='sxyz'):
         """Return Euler angles from rotation matrix for specified axis sequence.
@@ -288,19 +289,19 @@ class Controller(object):
         """
 
         while True:
-            if len(Controller.imu_measurements[0]) > 10:
-                data = copy.copy(Controller.imu_measurements)
+            if len(self.imu_measurements[0]) > 10:
+                data = copy.copy(self.imu_measurements)
                 # number of data points.
                 n = len(data[0])
                 acc = data[0][1:n]
                 gyr = data[1][1:n]
                 del_t = list()
 
-                for i in range(1,n):
-                    del_t[i] = data[2][i] - data[2][i-1]
+                for i in range(1, n):
+                    del_t.append(data[2][i] - data[2][i-1])
 
                 # NOTE: use locks
-                Controller.imu_measurements = ([], [], [])
+                self.imu_measurements = ([], [], [])
                 self.process_data(acc, gyr, del_t)
 
 
