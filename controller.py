@@ -10,6 +10,7 @@ import sys
 import time
 import copy
 import math
+from threading import Thread
 
 # imports for processing IMU data.
 import numpy as np
@@ -58,10 +59,10 @@ class Controller(object):
         self.t.daemon = True
         self.t.start()
 
-    def on_data(self, acceleration, angularrate, microseconds):
+    def on_data(self, acc, agr, microseconds):
         Controller.imu_measurements[0].append(acc)
         Controller.imu_measurements[1].append(agr)
-        Controller.imu_measurements[2].append(micorseconds)
+        Controller.imu_measurements[2].append(microseconds)
 
     def euler_from_matrix(self, matrix, axes='sxyz'):
         """Return Euler angles from rotation matrix for specified axis sequence.

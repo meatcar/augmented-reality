@@ -36,17 +36,17 @@ class PhidgetWrapper(object):
 
         source = e.device
         for index, spatialData in enumerate(e.spatialData):
-            if len(spatialData.Acceleration) > 0 and \
-                    len(spatialData.AngularRate) > 0:
+            if len(spatialData.Acceleration) > 0:
                 acc = [spatialData.Acceleration[0], \
                         spatialData.Acceleration[1], \
                         spatialData.Acceleration[2]]
 
+            if len(spatialData.AngularRate) > 0:
                 agr = [spatialData.AngularRate[0], \
                         spatialData.AngularRate[1], \
                         spatialData.AngularRate[2]]
 
-                self.callback(acc, agr, spatialData.Timestamp.microSeconds)
+            self.callback(acc, agr, spatialData.Timestamp.microSeconds)
 
 
     def on_attach(self, e):
@@ -76,3 +76,12 @@ class PhidgetWrapper(object):
                     (source.getSerialNum(), e.eCode, e.description)))
         except PhidgetException as e:
             print(("Phidget Exception %i: %s" % (e.code, e.details)))
+
+def test_data(acc, agr, time):
+    print('acc', acc, 'agr', agr, 'time', time)
+
+if __name__ == "__main__":
+    phidget = PhidgetWrapper(test_data)
+    while True:
+        continue
+
