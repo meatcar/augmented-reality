@@ -10,7 +10,6 @@ import sys
 import time
 import copy
 import math
-from threading import Thread
 
 # imports for processing IMU data.
 import numpy as np
@@ -18,14 +17,7 @@ from MahonyAHRS import MahonyAHRS
 from QuaternionLibrary import QuaternionLibrary
 from scipy.signal import butter, filtfilt
 
-# imports for handling IMU.
-from ctypes import *
-from Phidgets.Phidget import Phidget
-from Phidgets.PhidgetException import PhidgetErrorCodes, PhidgetException
-from Phidgets.Events.Events import SpatialDataEventArgs, AttachEventArgs
-from Phidgets.Events.Events import DetachEventArgs, ErrorEventArgs
-from Phidgets.Devices.Spatial import Spatial, SpatialEventData, TimeSpan
-
+from phidgetwrapper import PhidgetWrapper
 
 class Controller(object):
     """
@@ -52,92 +44,24 @@ class Controller(object):
     # stores acceleration, angular change and time delta.
     imu_measurements = ([], [], [])
 
-    def foobar(self):
-        print("in foobar yoo ..")
-        print((len(self.imu_measurements)))
-
-    class IMU_Handlers(object):
-        """
-
-        """
-
-        def on_data(self, e):
-            """
-
-            """
-
-            source = e.device
-            for index, spatialData in enumerate(e.spatialData):
-                if len(spatialData.Acceleration) > 0 and \
-                len(spatialData.AngularRate) > 0:
-                    acc = [spatialData.Acceleration[0], \
-                        spatialData.Acceleration[1], \
-                        spatialData.Acceleration[2]]
-
-                    agr = [spatialData.AngularRate[0], \
-                        spatialData.AngularRate[1], \
-                        spatialData.AngularRate[2]]
-
-                    Controller.imu_measurements[0].append(acc)
-                    Controller.imu_measurements[1].append(agr)
-                    Controller.imu_measurements[2].append(spatialData.Timestamp.microSeconds)
-
-        def on_attach(self, e):
-            """
-
-            """
-
-            return
-
-        def on_detach(self, e):
-            """
-
-            """
-
-            return
-
-        def on_error(self, e):
-            """
-
-            """
-
-            try:
-                source = e.device
-                print(("Spatial %i: Phidget Error %i: %s" % \
-                    (source.getSerialNum(), e.eCode, e.description)))
-            except PhidgetException as e:
-                print(("Phidget Exception %i: %s" % (e.code, e.details)))
-
     def __init__(self, head):
         """
 
         """
+        self.phidget = PhidgetWrapper(self.on_data)
 
         # head contains reference to object that is updated on every
         # update from the IMU.
         self.head = head
 
-        self.spatial = Spatial()
-        imu_handlers = Controller.IMU_Handlers()
+        self.t = Thread(target=self.update_head)
+        self.t.daemon = True
+        self.t.start()
 
-        # attach the event handlers.
-        try:
-            self.spatial.setOnAttachHandler(imu_handlers.on_attach)
-            self.spatial.setOnDetachHandler(imu_handlers.on_detach)
-            self.spatial.setOnErrorhandler(imu_handlers.on_error)
-            self.spatial.setOnSpatialDataHandler(imu_handlers.on_data)
-
-            self.spatial.openPhidget()
-            self.spatial.waitForAttach(1000)
-            self.spatial.setDataRate(4)
-        except:
-            print("Error connecting to IMU, I cannot handle this. " + \
-            "I will just go die now!")
-            exit(1)
-
-        t = Thread(target=self.update_head)
-        t.daemon = True
-        t.start()
+    def on_data(self, acceleration, angularrate, microseconds):
+        Controller.imu_measurements[0].append(acc)
+        Controller.imu_measurements[1].append(agr)
+        Controller.imu_measurements[2].append(micorseconds)
 
     def euler_from_matrix(self, matrix, axes='sxyz'):
         """Return Euler angles from rotation matrix for specified axis sequence.
