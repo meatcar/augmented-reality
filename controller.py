@@ -290,10 +290,18 @@ class Controller(object):
         while True:
             if len(Controller.imu_measurements[0]) > 10:
                 data = copy.copy(Controller.imu_measurements)
+                # number of data points.
+                n = len(data[0])
+                acc = data[1:n]
+                gyr = data[1:n]
+                del_t = list()
+
+                for i in range(1,n):
+                    del_t[i] = data[i] - data[i-1]
 
                 # NOTE: use locks
                 Controller.imu_measurements = ([], [], [])
-                self.process_data(data[0], data[1], data[2])
+                self.process_data(acc, gyr, del_t)
 
 
 if __name__ == "__main__":
