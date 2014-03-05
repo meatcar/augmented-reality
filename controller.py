@@ -292,12 +292,12 @@ class Controller(object):
                 data = copy.copy(Controller.imu_measurements)
                 # number of data points.
                 n = len(data[0])
-                acc = data[1:n]
-                gyr = data[1:n]
+                acc = data[0][1:n]
+                gyr = data[1][1:n]
                 del_t = list()
 
                 for i in range(1,n):
-                    del_t[i] = data[i] - data[i-1]
+                    del_t[i] = data[2][i] - data[2][i-1]
 
                 # NOTE: use locks
                 Controller.imu_measurements = ([], [], [])
