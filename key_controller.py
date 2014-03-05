@@ -35,6 +35,8 @@ class KeyController:
             self.head.x -= 0.02
         elif key is b'd':
             self.head.x += 0.02
+        elif key is b' ':
+            print(head)
 
     def on_passive_motion(self, x, y):
         if self.mousex is None:

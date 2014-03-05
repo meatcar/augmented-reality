@@ -1,5 +1,6 @@
 from SimpleCV import *
-disp = Display(flags = pg.FULLSCREEN)
+#disp = Display(flags = pg.FULLSCREEN)
+disp = Display()
 k = Kinect()
 points = []
 squares = []
@@ -11,13 +12,15 @@ while disp.isNotDone():
         depth.stretch(0,150)
         dark = depth - depth.colorDistance((80,80,80))
         dblobs = dark.findBlobs(minsize=1000)
-        
+
         box_center = None
         box = None
         box_point = None
         z_val = 0
         box_area = 0
         counter = 0
+        if not dblobs:
+            continue
         for b in dblobs:
             if ((dark[b.centroid()] < (100,100,100)) and (dark[b.centroid()] > (40,40, 40)) ):
                 box_x = b.minRectHeight()
@@ -38,8 +41,12 @@ while disp.isNotDone():
 
 
                     cropped = img.crop(bb[0], bb[1], bb[2], bb[3])
+                    if not cropped:
+                        box_center = None
+                        continue
                     blobs = cropped.findSkintoneBlobs()
                     if not blobs:
+                        box_center = None
                         continue
                     blob_mask = blobs[-1].blobImage()
                     hand = blobs[-1].contour()
@@ -51,7 +58,7 @@ while disp.isNotDone():
                     img.dl().circle(box_point, 20, Color.RED)
                     img.dl().polygon(hand_adj, filled=True, color=Color.YELLOW)
                     img.drawRectangle(bb[0], bb[1], bb[2], bb[3], color=Color.GREEN)
-                    
+
                     counter+=1
                     if counter == 2:
                         if abs(old_point[0] - box_point[0]) > 100 and abs(box_point[1] - box_point[0]) > 100:
@@ -60,21 +67,21 @@ while disp.isNotDone():
                             bottom = old_point
                             squares.append(top)
                             squares.append(bottom)
-                
-    
+
+
         if (len(points) > 0) and (box_center):
             x_delta = abs(box_point[0] - points[-1][0])
             y_delta = abs(box_point[1] - points[-1][1])
             if (x_delta < 100 and y_delta < 100):
                 points.append(box_point)
-            else: 
+            else:
                 points = []
                 points.append(box_point)
         elif (box_center):
             points.append(box_point)
 
-    
-    
+
+
         if len(points) > 2:
             img.dl().lines(points, Color.BLUE, width=2)
             if z_val != 0:

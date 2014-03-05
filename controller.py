@@ -43,7 +43,7 @@ class Controller(object):
         'rxzx': (0, 1, 1, 1), 'rxzy': (1, 0, 0, 1), 'ryzy': (1, 0, 1, 1),
         'rzxy': (1, 1, 0, 1), 'ryxy': (1, 1, 1, 1), 'ryxz': (2, 0, 0, 1),
         'rzxz': (2, 0, 1, 1), 'rxyz': (2, 1, 0, 1), 'rzyz': (2, 1, 1, 1)}
-    
+
     _TUPLE2AXES = dict((v, k) for k, v in _AXES2TUPLE.items())
 
     _NEXT_AXIS = [1, 2, 0, 1]
@@ -141,11 +141,11 @@ class Controller(object):
 
     def euler_from_matrix(self, matrix, axes='sxyz'):
         """Return Euler angles from rotation matrix for specified axis sequence.
-    
+
         axes : One of 24 axis sequences as string or encoded tuple
-    
+
         Note that many Euler angle triplets can describe one matrix.
-    
+
         >>> R0 = euler_matrix(1, 2, 3, 'syxz')
         >>> al, be, ga = euler_from_matrix(R0, 'syxz')
         >>> R1 = euler_matrix(al, be, ga, 'syxz')
@@ -156,18 +156,18 @@ class Controller(object):
         ...    R0 = euler_matrix(axes=axes, *angles)
         ...    R1 = euler_matrix(axes=axes, *euler_from_matrix(R0, axes))
         ...    if not numpy.allclose(R0, R1): print(axes, "failed")
-    
+
         """
         try:
             firstaxis, parity, repetition, frame = self._AXES2TUPLE[axes.lower()]
         except (AttributeError, KeyError):
             self._TUPLE2AXES[axes]  # validation
             firstaxis, parity, repetition, frame = axes
-    
+
         i = firstaxis
         j = self._NEXT_AXIS[i+parity]
         k = self._NEXT_AXIS[i-parity+1]
-    
+
         M = np.array(matrix, dtype=np.float64, copy=False)[:3, :3]
         if repetition:
             sy = math.sqrt(M[i, j]*M[i, j] + M[i, k]*M[i, k])
@@ -189,7 +189,7 @@ class Controller(object):
                 ax = math.atan2(-M[j, k],  M[j, j])
                 ay = math.atan2(-M[k, i],  cy)
                 az = 0.0
-    
+
         if parity:
             ax, ay, az = -ax, -ay, -az
         if frame:
@@ -349,11 +349,11 @@ class Controller(object):
         #self.head.zangle = np.dot([o_uz, o_vz, o_wz], [f_uz, f_vz, f_wz])
         #self.head.zangle = np.arccos(self.head.zangle)
 
-        
+
         x, y, z = self.euler_from_matrix(rotation_matrices[N-1])
-        self.head.xangle += x
-        self.head.yangle += y
-        self.head.zangle += z
+        self.head.xangle += x * 2
+        self.head.yangle += y * 2
+        self.head.zangle += z * 2
         #self.head.xangle, self.head.yangle, self.head.zangle = self.euler_from_matrix(rotation_matrices[N-1])
         self.head.rot_matrix = rotation_matrices[N-1]
 
@@ -374,7 +374,7 @@ class Controller(object):
 if __name__ == "__main__":
     h = Head()
     c = Controller(h)
-    
+
     while True:
         time.sleep(1)
         print(h)
