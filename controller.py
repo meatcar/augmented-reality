@@ -236,6 +236,7 @@ class Controller(object):
 
         # Update the position
 
+        t = 0.1
         for a in acc:
             a_x = a[0]
             a_y = a[1]
