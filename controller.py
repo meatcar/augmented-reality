@@ -42,15 +42,14 @@ class Controller(object):
     _NEXT_AXIS = [1, 2, 0, 1]
     _EPS = np.finfo(float).eps * 4.0
 
+    # stores acceleration, angular change and time delta.
+    imu_measurements = {"acc" : [], "gyr" : [], "time" : []}
+
     def __init__(self, head):
         """
 
         """
         self.phidget = PhidgetWrapper(self.on_data)
-
-        # stores acceleration, angular change and time delta.
-        self.imu_measurements = ([], [], [])
-
 
         # head contains reference to object that is updated on every
         # update from the IMU.
@@ -61,9 +60,9 @@ class Controller(object):
         self.t.start()
 
     def on_data(self, acc, agr, microseconds):
-        self.imu_measurements[0].append(acc)
-        self.imu_measurements[1].append(agr)
-        self.imu_measurements[2].append(microseconds)
+        Controller.imu_measurements["acc"].append(acc)
+        Controller.imu_measurements["gyr"].append(agr)
+        Controller.imu_measurements["time"].append(microseconds)
 
     def euler_from_matrix(self, matrix, axes='sxyz'):
         """Return Euler angles from rotation matrix for specified axis sequence.
@@ -235,6 +234,25 @@ class Controller(object):
             #self.head.y += y
             #self.head.z += z
 
+        # Update the position
+
+        t = 0.1
+        for a in acc:
+            a_x = a[0]
+            a_y = a[1]
+            a_z = a[2] - 1 # subtract 1 G from the up direction.
+            
+            x = (a_x*t*t);
+            y = (a_y*t*t);
+            z = (a_z*t*t);
+
+            if x > 0.01 or x < 0:
+                self.head.x = self.head.x + 10*(a_x*t*t);
+            if y > 0.01 or y < 0:
+                self.head.y = self.head.y + 10*(a_y*t*t);
+            if z > 0.01 or z < 0:
+                self.head.z = self.head.z + 10*(a_z*t*t);
+
         # original velocity vectors
         o_ux = rotation_matrices[0][0,0]
         o_vx = rotation_matrices[0][1,0]
@@ -275,7 +293,6 @@ class Controller(object):
         #self.head.zangle = np.dot([o_uz, o_vz, o_wz], [f_uz, f_vz, f_wz])
         #self.head.zangle = np.arccos(self.head.zangle)
 
-
         x, y, z = self.euler_from_matrix(rotation_matrices[N-1])
         self.head.xangle += x * 2
         self.head.yangle += y * 2
@@ -288,20 +305,47 @@ class Controller(object):
 
         """
 
+        data_window = {"acc" : [], "gyr" : [], "time" : []}
+        init_window = False      
+        S = 0  # data window size
         while True:
-            if len(self.imu_measurements[0]) > 10:
-                data = copy.copy(self.imu_measurements)
+            if not init_window:
+                if len(Controller.imu_measurements["acc"]) > 20:
+                    data = copy.copy(Controller.imu_measurements)
+                    data_window["acc"] = data["acc"]
+                    data_window["gyr"] = data["gyr"]
+                    data_window["time"] = data["time"]
+                    S = len(data_window["acc"]);
+                    init_window = True
+
+            if init_window and len(Controller.imu_measurements["acc"]) > 10:
+                data = copy.copy(Controller.imu_measurements)
                 # number of data points.
-                n = len(data[0])
-                acc = data[0][1:n]
-                gyr = data[1][1:n]
+                n = len(data["acc"])
+
+                # shift the latter data points foward
+                # and add the next n measurements to the end of the
+                # data_window.
+                data_window["acc"][0:S-n] = data_window["acc"][(S-n):S]
+                data_window["acc"][(S-n):S] = data["acc"]
+                
+                data_window["gyr"][0:S-n] = data_window["gyr"][(S-n):S]
+                data_window["gyr"][(S-n):S] = data["gyr"]
+
+                data_window["time"][0:S-n] = data_window["time"][(S-n):S]
+                data_window["time"][(S-n):S] = data["time"]  
+
+                acc = data_window["acc"][1:n]
+                gyr = data_window["gyr"][1:n]
                 del_t = list()
 
-                for i in range(1, n):
-                    del_t.append(data[2][i] - data[2][i-1])
+                for i in range(1,n):
+                    del_t.append(\
+                        data_window["time"][i]-data_window["time"][i-1])
 
                 # NOTE: use locks
-                self.imu_measurements = ([], [], [])
+                Controller.imu_measurements = \
+                    {"acc" : [], "gyr" : [], "time" : []}
                 self.process_data(acc, gyr, del_t)
 
 
