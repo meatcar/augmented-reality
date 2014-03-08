@@ -1,0 +1,1 @@
+g++ depth.cxx -std=c++11 -I '/opt/softkinetic/DepthSenseSDK/include'  -L '/opt/softkinetic/DepthSenseSDK/lib' -lturbojpeg -lDepthSensePlugins -lDepthSense -lpython2.7
