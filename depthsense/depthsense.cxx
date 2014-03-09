@@ -24,14 +24,25 @@
 #include <windows.h>
 #endif
 
+// Python Module includes
 #include <python2.7/Python.h>
 #include <python2.7/numpy/arrayobject.h>
+
+// C includes
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <stdlib.h>
+
+// C++ includes
 #include <vector>
 #include <exception>
 #include <iostream>
 #include <thread>
 
+// DepthSense SDK includes
 #include <DepthSense.hxx>
 
 using namespace DepthSense;
@@ -51,10 +62,15 @@ static bool g_bDeviceFound = false;
 static ProjectionHelper* g_pProjHelper = NULL;
 static StereoCameraParameters g_scp;
 
-//static bool depth_in_use = true;
-static double depthMap[320*240];
-static double depthMapClone[320*240]
+static int32_t dW = 320;
+static int32_t dH = 240;
+
+int child_pid = 0;
+
 //TODO: BUILD LOCK FOR MAP
+static uint16_t *depthMap;
+static uint16_t depthMapClone[320*240];
+int shmsz = sizeof(uint16_t)*dW*dH;
 
 /*----------------------------------------------------------------------------*/
 // New audio sample event handler
@@ -78,35 +94,16 @@ static void onNewColorSample(ColorNode node, ColorNode::NewSampleReceivedData da
 // New depth sample event handler
 static void onNewDepthSample(DepthNode node, DepthNode::NewSampleReceivedData data)
 {
-    //printf("Z#%u: %d\n",g_dFrames,data.vertices.size());
-
-    // Project some 3D points in the Color Frame
-    if (!g_pProjHelper)
-    {
-        g_pProjHelper = new ProjectionHelper (data.stereoCameraParameters);
-        g_scp = data.stereoCameraParameters;
-    }
-    else if (g_scp != data.stereoCameraParameters)
-    {
-        g_pProjHelper->setStereoCameraParameters(data.stereoCameraParameters);
-        g_scp = data.stereoCameraParameters;
-    }
-
-    int32_t w, h;
-    FrameFormat_toResolution(data.captureConfiguration.frameFormat,&w,&h);
 
     //TODO: grab lock
-    for (int i=0; i<h; i++) {
-        for(int j=0; j<w; j++) {
-            depthMap[i*w +j] = data.depthMap[i*w + j]; 
+    for (int i=0; i<dH; i++) {
+        for(int j=0; j<dW; j++) {
+            //depthMap[i*dW +j] = (uint16_t) ((((double) data.depthMap[i*dW + j])/31999.0) * 255); 
+            depthMap[i*dW +j] = (data.depthMap[i*dW + j]); 
         }
     }
     //TODO: release lock
     g_dFrames++;
-
-    // Quit the main loop after 200 depth frames received
-    //if (g_dFrames == 200)
-    //    g_context.quit();
 }
 
 /*----------------------------------------------------------------------------*/
@@ -158,7 +155,6 @@ static void configureDepthNode()
     config.mode = DepthNode::CAMERA_MODE_CLOSE_MODE;
     config.saturation = true;
 
-    g_dnode.setEnableVertices(true);
     g_dnode.setEnableDepthMap(true);
 
     try 
@@ -309,73 +305,102 @@ static void onDeviceDisconnected(Context context, Context::DeviceRemovedData dat
     printf("Device disconnected\n");
 }
 
-static void init()
+extern "C" {
+    static void killds(){
+        if (child_pid !=0)
+            kill(child_pid, SIGTERM);
+            munmap(depthMap, shmsz);
+
+    }
+}
+
+static void initds()
 {
-    g_context = Context::create("localhost");
-    g_context.deviceAddedEvent().connect(&onDeviceConnected);
-    g_context.deviceRemovedEvent().connect(&onDeviceDisconnected);
-
-    // Get the list of currently connected devices
-    vector<Device> da = g_context.getDevices();
-
-    // We are only interested in the first device
-    if (da.size() >= 1)
-    {
-        g_bDeviceFound = true;
-
-        da[0].nodeAddedEvent().connect(&onNodeConnected);
-        da[0].nodeRemovedEvent().connect(&onNodeDisconnected);
-
-        vector<Node> na = da[0].getNodes();
-        
-        printf("Found %u nodes\n",na.size());
-        
-        for (int n = 0; n < (int)na.size();n++)
-            configureNode(na[n]);
+    // shared mem like a pro.
+    if ((depthMap = (uint16_t *) mmap(NULL, shmsz, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
+        perror("mmap: cannot alloc shmem;"); 
+        exit(1); 
     }
 
-    g_context.startNodes();
-    g_context.run();
-    g_context.stopNodes();
+    // child goes into loop
+    child_pid = fork();
+    if (child_pid == 0) {
+        g_context = Context::create("localhost");
+        g_context.deviceAddedEvent().connect(&onDeviceConnected);
+        g_context.deviceRemovedEvent().connect(&onDeviceDisconnected);
 
-    if (g_cnode.isSet()) g_context.unregisterNode(g_cnode);
-    if (g_dnode.isSet()) g_context.unregisterNode(g_dnode);
-    if (g_anode.isSet()) g_context.unregisterNode(g_anode);
+        // Get the list of currently connected devices
+        vector<Device> da = g_context.getDevices();
 
-    if (g_pProjHelper)
-        delete g_pProjHelper;
+        // We are only interested in the first device
+        if (da.size() >= 1)
+        {
+            g_bDeviceFound = true;
+
+            da[0].nodeAddedEvent().connect(&onNodeConnected);
+            da[0].nodeRemovedEvent().connect(&onNodeDisconnected);
+
+            vector<Node> na = da[0].getNodes();
+            
+            //printf("Found %u nodes\n",na.size());
+            
+            for (int n = 0; n < (int)na.size();n++)
+                configureNode(na[n]);
+        }
+
+        g_context.startNodes();
+        g_context.run();
+        g_context.stopNodes();
+
+        if (g_cnode.isSet()) g_context.unregisterNode(g_cnode);
+        if (g_dnode.isSet()) g_context.unregisterNode(g_dnode);
+        if (g_anode.isSet()) g_context.unregisterNode(g_anode);
+
+        if (g_pProjHelper)
+            delete g_pProjHelper;
+
+        exit(EXIT_SUCCESS);
+    }
 
 }
 /*----------------------------------------------------------------------------*/
 
-static PyObject *getDepth(PyObject *self, PyObject *args) {
+static PyObject *getDepth(PyObject *self, PyObject *args) 
+{
     int depthWidth = 320;
     int depthHeight = 240;
-    npy_intp dims[2] = {depthWidth, depthHeight};
+    npy_intp dims[2] = {depthHeight, depthWidth};
 
     //TODO: grab lock
     // memcpy(depthMapClone, depthMap, depthWidth*depthHeight, sizeof(double);
     //TODO: release lock
-    return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, depthMapClone);
+    return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, depthMap);
 }
 
-static PyObject *initDepth(PyObject *self, PyObject *args) {
-    //TODO: FORK MOFUCKA
-    // threading doesnt seem to help, python blocks on call regardless of what i do.
-    // in child do: init();
-    // in parent do below:
+static PyObject *initDepth(PyObject *self, PyObject *args)
+{
+    initds();
     return Py_None;
 }
 
-static PyMethodDef DepthMethods[] = {
+static PyObject *killDepth(PyObject *self, PyObject *args)
+{
+    killds();
+    return Py_None;
+}
+
+static PyMethodDef DepthSenseMethods[] = {
     {"getDepthMap",  getDepth, METH_VARARGS, "Get Depth Map"},
-    {"initDepthMap",  initDepth, METH_VARARGS, "Init Depth Map"},
+    {"initDepthSense",  initDepth, METH_VARARGS, "Init DepthSense"},
+    {"killDepthSense",  killDepth, METH_VARARGS, "Kill DepthSense"},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
 
-PyMODINIT_FUNC initdepth(void){
-    (void) Py_InitModule("depth", DepthMethods);
+PyMODINIT_FUNC initDepthSense(void)
+{
+    (void) Py_InitModule("DepthSense", DepthSenseMethods);
+    (void) Py_AtExit(killds);
     import_array();
 }
 
@@ -383,18 +408,17 @@ int main(int argc, char* argv[])
 {
     
     /* Pass argv[0] to the Python interpreter */
-    Py_SetProgramName(argv[0]);
+    Py_SetProgramName((char *)"DepthSense");
 
     /* Initialize the Python interpreter.  Required. */
     Py_Initialize();
 
     /* Add a static module */
-    initdepth();
+    initDepthSense();
+
     //thread worker(&init);
     //printf("HERE\n");
     //worker.join();
-    init();
-
     
     return 0;
 }
