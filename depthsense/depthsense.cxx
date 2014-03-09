@@ -35,6 +35,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <pthread.h>
 
 // C++ includes
 #include <vector>
@@ -68,6 +69,10 @@ static int32_t dH = 240;
 int child_pid = 0;
 
 //TODO: BUILD LOCK FOR MAP
+// Build lock and two shared mem regions
+pthread_mutex_t *lock;
+pthread_mutexattr_t matr;
+
 static uint16_t *depthMap;
 static uint16_t depthMapClone[320*240];
 int shmsz = sizeof(uint16_t)*dW*dH;
@@ -95,14 +100,13 @@ static void onNewColorSample(ColorNode node, ColorNode::NewSampleReceivedData da
 static void onNewDepthSample(DepthNode node, DepthNode::NewSampleReceivedData data)
 {
 
-    //TODO: grab lock
+    //pthread_mutex_lock(lock);
     for (int i=0; i<dH; i++) {
         for(int j=0; j<dW; j++) {
-            //depthMap[i*dW +j] = (uint16_t) ((((double) data.depthMap[i*dW + j])/31999.0) * 255); 
             depthMap[i*dW +j] = (data.depthMap[i*dW + j]); 
         }
     }
-    //TODO: release lock
+    //pthread_mutex_unlock(lock);
     g_dFrames++;
 }
 
@@ -310,6 +314,7 @@ extern "C" {
         if (child_pid !=0)
             kill(child_pid, SIGTERM);
             munmap(depthMap, shmsz);
+            munmap(lock, sizeof(pthread_mutex_t));
 
     }
 }
@@ -321,6 +326,12 @@ static void initds()
         perror("mmap: cannot alloc shmem;"); 
         exit(1); 
     }
+    if ((lock = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
+        perror("mmap: cannot alloc shmem;"); 
+        exit(1); 
+    }
+
+    pthread_mutexattr_init(&matr);
 
     // child goes into loop
     child_pid = fork();
@@ -371,10 +382,10 @@ static PyObject *getDepth(PyObject *self, PyObject *args)
     int depthHeight = 240;
     npy_intp dims[2] = {depthHeight, depthWidth};
 
-    //TODO: grab lock
-    // memcpy(depthMapClone, depthMap, depthWidth*depthHeight, sizeof(double);
-    //TODO: release lock
-    return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, depthMap);
+    //pthread_mutex_lock(lock);
+    memcpy(depthMapClone, depthMap, shmsz);
+    //pthread_mutex_unlock(lock);
+    return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, depthMapClone);
 }
 
 static PyObject *initDepth(PyObject *self, PyObject *args)
