@@ -66,6 +66,10 @@ static StereoCameraParameters g_scp;
 static int32_t dW = 320;
 static int32_t dH = 240;
 
+static int32_t cW = 640;
+static int32_t cH = 480;
+
+
 int child_pid = 0;
 
 //TODO: BUILD LOCK FOR MAP
@@ -75,7 +79,12 @@ pthread_mutexattr_t matr;
 
 static uint16_t *depthMap;
 static uint16_t depthMapClone[320*240];
-int shmsz = sizeof(uint16_t)*dW*dH;
+
+static uint8_t *colourMap;
+static uint8_t colourMapClone[640*480*3];
+
+int dshmsz = dW*dH*sizeof(uint16_t);
+int cshmsz = cW*cH*sizeof(uint8_t);
 
 /*----------------------------------------------------------------------------*/
 // New audio sample event handler
@@ -92,6 +101,12 @@ static void onNewAudioSample(AudioNode node, AudioNode::NewSampleReceivedData da
 static void onNewColorSample(ColorNode node, ColorNode::NewSampleReceivedData data)
 {
     //printf("C#%u: %d\n",g_cFrames,data.colorMap.size());
+    for (int i=0; i<cH; i++) {
+        for(int j=0; j<cW*3; j++) {
+            colourMap[i*cW*3 +j] = (data.colorMap[i*cW*3 + j]); 
+        }
+    }
+    //pthread_mutex_unlock(lock);
     g_cFrames++;
 }
 
@@ -313,7 +328,8 @@ extern "C" {
     static void killds(){
         if (child_pid !=0)
             kill(child_pid, SIGTERM);
-            munmap(depthMap, shmsz);
+            munmap(depthMap, dshmsz);
+            munmap(colourMap, cshmsz*3);
             munmap(lock, sizeof(pthread_mutex_t));
 
     }
@@ -322,10 +338,16 @@ extern "C" {
 static void initds()
 {
     // shared mem like a pro.
-    if ((depthMap = (uint16_t *) mmap(NULL, shmsz, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
+    if ((depthMap = (uint16_t *) mmap(NULL, dshmsz, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
         perror("mmap: cannot alloc shmem;"); 
         exit(1); 
     }
+
+    if ((colourMap = (uint8_t *) mmap(NULL, cshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
+        perror("mmap: cannot alloc shmem;"); 
+        exit(1); 
+    }
+
     if ((lock = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
         perror("mmap: cannot alloc shmem;"); 
         exit(1); 
@@ -376,6 +398,16 @@ static void initds()
 }
 /*----------------------------------------------------------------------------*/
 
+static PyObject *getColour(PyObject *self, PyObject *args) 
+{
+    npy_intp dims[3] = {cH, cW, 3};
+
+    //pthread_mutex_lock(lock);
+    memcpy(colourMapClone, colourMap, cshmsz*3);
+    //pthread_mutex_unlock(lock);
+    return PyArray_SimpleNewFromData(3, dims, NPY_UINT8, colourMapClone);
+}
+
 static PyObject *getDepth(PyObject *self, PyObject *args) 
 {
     int depthWidth = 320;
@@ -383,18 +415,18 @@ static PyObject *getDepth(PyObject *self, PyObject *args)
     npy_intp dims[2] = {depthHeight, depthWidth};
 
     //pthread_mutex_lock(lock);
-    memcpy(depthMapClone, depthMap, shmsz);
+    memcpy(depthMapClone, depthMap, dshmsz);
     //pthread_mutex_unlock(lock);
     return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, depthMapClone);
 }
 
-static PyObject *initDepth(PyObject *self, PyObject *args)
+static PyObject *initDepthS(PyObject *self, PyObject *args)
 {
     initds();
     return Py_None;
 }
 
-static PyObject *killDepth(PyObject *self, PyObject *args)
+static PyObject *killDepthS(PyObject *self, PyObject *args)
 {
     killds();
     return Py_None;
@@ -402,8 +434,9 @@ static PyObject *killDepth(PyObject *self, PyObject *args)
 
 static PyMethodDef DepthSenseMethods[] = {
     {"getDepthMap",  getDepth, METH_VARARGS, "Get Depth Map"},
-    {"initDepthSense",  initDepth, METH_VARARGS, "Init DepthSense"},
-    {"killDepthSense",  killDepth, METH_VARARGS, "Kill DepthSense"},
+    {"getColourMap",  getColour, METH_VARARGS, "Get Colour Map"},
+    {"initDepthSense",  initDepthS, METH_VARARGS, "Init DepthSense"},
+    {"killDepthSense",  killDepthS, METH_VARARGS, "Kill DepthSense"},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 

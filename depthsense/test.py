@@ -5,14 +5,27 @@ c = 0
 ds.initDepthSense()
 while True:
     depth = ds.getDepthMap()
+
+    print "START"
+    print depth[100][100]
     np.clip(depth, 0, 2**10 - 1, depth)
+    print depth[100][100]
     depth >>=2
+    print depth[100][100]
     depth = depth.astype(np.uint8).transpose()
+    print depth[100][100]
+    print "END"
+    iD = Image(depth)
     
-    i = Image(depth)
-    i.show()
+    #iD = Image(depth.transpose())
+    image = ds.getColourMap()
+    image = image[:,:,::-1]
+    iS = Image(image.transpose([1,0,2]))
+    iS.sideBySide(iD).show()
+    #iD.show()
+    #iS.show()
     c+=1 
-    if c > 100:
+    if c > 10000:
         ds.killDepthSense()
         break
     
