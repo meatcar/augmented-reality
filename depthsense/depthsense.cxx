@@ -35,7 +35,6 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <pthread.h>
 
 // C++ includes
 #include <vector>
@@ -49,42 +48,55 @@
 using namespace DepthSense;
 using namespace std;
 
+// depth sense node inits 
 static Context g_context;
 static DepthNode g_dnode;
 static ColorNode g_cnode;
 static AudioNode g_anode;
 
+static bool g_bDeviceFound = false;
+
+// unecassary frame counters 
 static uint32_t g_aFrames = 0;
 static uint32_t g_cFrames = 0;
 static uint32_t g_dFrames = 0;
 
-static bool g_bDeviceFound = false;
 
-static ProjectionHelper* g_pProjHelper = NULL;
-static StereoCameraParameters g_scp;
-
+// map dimensions 
 static int32_t dW = 320;
 static int32_t dH = 240;
-
 static int32_t cW = 640;
 static int32_t cH = 480;
 
+int dshmsz = dW*dH*sizeof(uint16_t);
+int cshmsz = cW*cH*sizeof(uint8_t);
+
+// shared mem depth maps
+static uint16_t *depthMap;
+static uint16_t *depthFullMap;
+
+// shared mem colour maps
+static uint8_t *colourMap;
+static uint8_t *colourFullMap;
+
+// internal map copies 
+static uint8_t colourMapClone[640*480*3];
+static uint16_t depthMapClone[320*240];
 
 int child_pid = 0;
 
-//TODO: BUILD LOCK FOR MAP
-// Build lock and two shared mem regions
-pthread_mutex_t *lock;
-pthread_mutexattr_t matr;
+// can't write atomic op but i can atleast do a swap
+static void dptrSwap (uint16_t **pa, uint16_t **pb){
+        uint16_t *temp = *pa;
+        *pa = *pb;
+        *pb = temp;
+}
 
-static uint16_t *depthMap;
-static uint16_t depthMapClone[320*240];
-
-static uint8_t *colourMap;
-static uint8_t colourMapClone[640*480*3];
-
-int dshmsz = dW*dH*sizeof(uint16_t);
-int cshmsz = cW*cH*sizeof(uint8_t);
+static void cptrSwap (uint8_t **pa, uint8_t **pb){
+        uint8_t *temp = *pa;
+        *pa = *pb;
+        *pb = temp;
+}
 
 /*----------------------------------------------------------------------------*/
 // New audio sample event handler
@@ -101,12 +113,8 @@ static void onNewAudioSample(AudioNode node, AudioNode::NewSampleReceivedData da
 static void onNewColorSample(ColorNode node, ColorNode::NewSampleReceivedData data)
 {
     //printf("C#%u: %d\n",g_cFrames,data.colorMap.size());
-    for (int i=0; i<cH; i++) {
-        for(int j=0; j<cW*3; j++) {
-            colourMap[i*cW*3 +j] = (data.colorMap[i*cW*3 + j]); 
-        }
-    }
-    //pthread_mutex_unlock(lock);
+    memcpy(colourMap, data.colorMap, 3*cshmsz);
+    cptrSwap(&colourMap, &colourFullMap);
     g_cFrames++;
 }
 
@@ -114,14 +122,8 @@ static void onNewColorSample(ColorNode node, ColorNode::NewSampleReceivedData da
 // New depth sample event handler
 static void onNewDepthSample(DepthNode node, DepthNode::NewSampleReceivedData data)
 {
-
-    //pthread_mutex_lock(lock);
-    for (int i=0; i<dH; i++) {
-        for(int j=0; j<dW; j++) {
-            depthMap[i*dW +j] = (data.depthMap[i*dW + j]); 
-        }
-    }
-    //pthread_mutex_unlock(lock);
+    memcpy(depthMap, data.depthMap, dshmsz);
+    dptrSwap(&depthMap, &depthFullMap);
     g_dFrames++;
 }
 
@@ -170,16 +172,17 @@ static void configureDepthNode()
 
     DepthNode::Configuration config = g_dnode.getConfiguration();
     config.frameFormat = FRAME_FORMAT_QVGA;
-    config.framerate = 25;
+    config.framerate = 30;
     config.mode = DepthNode::CAMERA_MODE_CLOSE_MODE;
+    //config.mode = DepthNode::CAMERA_MODE_LONG_RANGE;
     config.saturation = true;
-
     g_dnode.setEnableDepthMap(true);
+    g_dnode.setEnableConfidenceMap(true);
 
     try 
     {
         g_context.requestControl(g_dnode,0);
-
+        g_dnode.setConfidenceThreshold(100);
         g_dnode.setConfiguration(config);
     }
     catch (ArgumentException& e)
@@ -222,8 +225,8 @@ static void configureColorNode()
     ColorNode::Configuration config = g_cnode.getConfiguration();
     config.frameFormat = FRAME_FORMAT_VGA;
     config.compression = COMPRESSION_TYPE_MJPEG;
-    config.powerLineFrequency = POWER_LINE_FREQUENCY_50HZ;
-    config.framerate = 25;
+    config.powerLineFrequency = POWER_LINE_FREQUENCY_60HZ;
+    config.framerate = 30;
 
     g_cnode.setEnableColorMap(true);
 
@@ -329,16 +332,22 @@ extern "C" {
         if (child_pid !=0)
             kill(child_pid, SIGTERM);
             munmap(depthMap, dshmsz);
+            munmap(depthFullMap, dshmsz);
             munmap(colourMap, cshmsz*3);
-            munmap(lock, sizeof(pthread_mutex_t));
+            munmap(colourFullMap, cshmsz*3);
 
     }
 }
 
 static void initds()
 {
-    // shared mem like a pro.
+    // shared mem double buffers
     if ((depthMap = (uint16_t *) mmap(NULL, dshmsz, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
+        perror("mmap: cannot alloc shmem;"); 
+        exit(1); 
+    }
+
+    if ((depthFullMap = (uint16_t *) mmap(NULL, dshmsz, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
         perror("mmap: cannot alloc shmem;"); 
         exit(1); 
     }
@@ -348,12 +357,10 @@ static void initds()
         exit(1); 
     }
 
-    if ((lock = (pthread_mutex_t *) mmap(NULL, sizeof(pthread_mutex_t), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
+    if ((colourFullMap = (uint8_t *) mmap(NULL, cshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
         perror("mmap: cannot alloc shmem;"); 
         exit(1); 
     }
-
-    pthread_mutexattr_init(&matr);
 
     // child goes into loop
     child_pid = fork();
@@ -389,9 +396,6 @@ static void initds()
         if (g_dnode.isSet()) g_context.unregisterNode(g_dnode);
         if (g_anode.isSet()) g_context.unregisterNode(g_anode);
 
-        if (g_pProjHelper)
-            delete g_pProjHelper;
-
         exit(EXIT_SUCCESS);
     }
 
@@ -402,21 +406,15 @@ static PyObject *getColour(PyObject *self, PyObject *args)
 {
     npy_intp dims[3] = {cH, cW, 3};
 
-    //pthread_mutex_lock(lock);
-    memcpy(colourMapClone, colourMap, cshmsz*3);
-    //pthread_mutex_unlock(lock);
+    memcpy(colourMapClone, colourFullMap, cshmsz*3);
     return PyArray_SimpleNewFromData(3, dims, NPY_UINT8, colourMapClone);
 }
 
 static PyObject *getDepth(PyObject *self, PyObject *args) 
 {
-    int depthWidth = 320;
-    int depthHeight = 240;
-    npy_intp dims[2] = {depthHeight, depthWidth};
+    npy_intp dims[2] = {dH, dW};
 
-    //pthread_mutex_lock(lock);
-    memcpy(depthMapClone, depthMap, dshmsz);
-    //pthread_mutex_unlock(lock);
+    memcpy(depthMapClone, depthFullMap, dshmsz);
     return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, depthMapClone);
 }
 
