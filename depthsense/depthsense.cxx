@@ -177,7 +177,7 @@ static void configureDepthNode()
     //config.mode = DepthNode::CAMERA_MODE_LONG_RANGE;
     config.saturation = true;
     g_dnode.setEnableDepthMap(true);
-    g_dnode.setEnableConfidenceMap(true);
+    //g_dnode.setEnableConfidenceMap(true);
 
     try 
     {
@@ -225,7 +225,7 @@ static void configureColorNode()
     ColorNode::Configuration config = g_cnode.getConfiguration();
     config.frameFormat = FRAME_FORMAT_VGA;
     config.compression = COMPRESSION_TYPE_MJPEG;
-    config.powerLineFrequency = POWER_LINE_FREQUENCY_60HZ;
+    config.powerLineFrequency = POWER_LINE_FREQUENCY_50HZ;
     config.framerate = 30;
 
     g_cnode.setEnableColorMap(true);
@@ -233,6 +233,15 @@ static void configureColorNode()
     try 
     {
         g_context.requestControl(g_cnode,0);
+
+        g_cnode.setBrightness(0);
+        g_cnode.setContrast(5);
+        g_cnode.setSaturation(5);
+        g_cnode.setHue(0);
+        g_cnode.setGamma(3);
+        g_cnode.setWhiteBalance(4650);
+        g_cnode.setSharpness(5);
+        g_cnode.setWhiteBalanceAuto(true);
 
         g_cnode.setConfiguration(config);
     }
