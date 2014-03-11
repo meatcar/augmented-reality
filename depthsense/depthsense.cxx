@@ -40,7 +40,7 @@
 #include <vector>
 #include <exception>
 #include <iostream>
-#include <thread>
+//#include <thread>
 
 // DepthSense SDK includes
 #include <DepthSense.hxx>
@@ -228,7 +228,6 @@ static void configureColorNode()
     config.powerLineFrequency = POWER_LINE_FREQUENCY_50HZ;
     config.framerate = 30;
 
-    g_cnode.setEnableColorMap(true);
 
     try 
     {
@@ -242,7 +241,6 @@ static void configureColorNode()
         g_cnode.setWhiteBalance(4650);
         g_cnode.setSharpness(5);
         g_cnode.setWhiteBalanceAuto(true);
-
         g_cnode.setConfiguration(config);
     }
     catch (ArgumentException& e)
@@ -273,6 +271,9 @@ static void configureColorNode()
     {
         printf("TimeoutException\n");
     }
+    
+    // must be done at the end to support usb3.0
+    g_cnode.setEnableColorMap(true);
 }
 
 /*----------------------------------------------------------------------------*/

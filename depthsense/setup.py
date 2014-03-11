@@ -4,7 +4,7 @@ module = Extension('DepthSense',
         include_dirs = ['/usr/local/include', '/opt/softkinetic/DepthSenseSDK/include'],
         libraries = ['DepthSensePlugins', 'DepthSense', 'python2.7'],
         library_dirs = ['/usr/local/lib', '/opt/softkinetic/DepthSenseSDK/lib'],
-        extra_compile_args = ['-std=c++11'],
+        #extra_compile_args = ['-std=g++11'],
         sources = ['depthsense.cxx'])
 
 setup (name = 'DepthSense',
