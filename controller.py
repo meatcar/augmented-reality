@@ -293,7 +293,11 @@ class Controller(object):
         #self.head.zangle = np.dot([o_uz, o_vz, o_wz], [f_uz, f_vz, f_wz])
         #self.head.zangle = np.arccos(self.head.zangle)
 
-        x, y, z = self.euler_from_matrix(rotation_matrices[N-1])
+        x, y, z = 0, 0, 0
+        for i in range(0,N):
+            x, y, z += (self.euler_from_matrix(rotation_matrices[i])/N)
+            # maybe do a weighted avg instead
+        
         self.head.xangle += x * 2
         self.head.yangle += y * 2
         self.head.zangle += z * 2
