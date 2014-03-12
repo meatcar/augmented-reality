@@ -18,6 +18,8 @@ from MahonyAHRS import MahonyAHRS
 from QuaternionLibrary import QuaternionLibrary
 from scipy.signal import butter, filtfilt
 
+from LinearKalmanFilter import KalmanFilterLinear
+
 from phidgetwrapper import PhidgetWrapper
 
 class Controller(object):
@@ -236,12 +238,47 @@ class Controller(object):
 
         # Update the position
 
+        # perform filtering on a per axis basis.
+        # A = np.matrix([1])
+        # H = np.matrix([1])
+        # B = np.matrix([0])
+        # Q = np.matrix([0.00001])
+        # R = np.matrix([0.1])
+        # xhat = np.matrix([3])
+        # P    = np.matrix([1])
+
+        # filter_x = KalmanFilterLinear(A,B,H,xhat,P,Q,R)
+        # filter_y = KalmanFilterLinear(A,B,H,xhat,P,Q,R)
+        # filter_z = KalmanFilterLinear(A,B,H,xhat,P,Q,R)
+
+        # # Record the smooth'd values.
+        # a_X = []
+        # a_Y = []
+        # a_Z = []
+
+        # for i in range(0,len(acc)):
+        #     measured_x = acc[i][0]    
+        #     a_X.append(filter_x.GetCurrentState()[0,0])
+        #     filter_x.Step(np.matrix([0]),np.matrix([measured_x]))
+
+        #     measured_y = acc[i][1]    
+        #     a_Y.append(filter_y.GetCurrentState()[0,0])
+        #     filter_y.Step(np.matrix([0]),np.matrix([measured_y]))
+
+        #     measured_z = acc[i][2]    
+        #     a_Z.append(filter_z.GetCurrentState()[0,0])
+        #     filter_z.Step(np.matrix([0]),np.matrix([measured_z]))
+
         t = 0.1
-        for a in acc:
-            a_x = a[0]
-            a_y = a[1]
-            a_z = a[2] - 1 # subtract 1 G from the up direction.
+        for i in range(0,len(acc)):
+            # a_x = a_X[0]
+            # a_y = a_Y[1]
+            # a_z = a_Z[2] - 1 # subtract 1 G from the up direction.
             
+            a_x = acc[i][0]
+            a_y = acc[i][1]
+            a_z = acc[i][2] - 1
+
             x = (a_x*t*t);
             y = (a_y*t*t);
             z = (a_z*t*t);
