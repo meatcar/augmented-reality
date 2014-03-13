@@ -109,7 +109,8 @@ class Controller(object):
                 self.head.yangle = 0
                 # self.head.xangle = pitch_angle_deg - init_pitch
                 # self.head.yangle = roll_angle_deg - init_roll
-                self.head.zangle = yaw_angle_deg - init_yaw
+                if yaw_angle_deg - init_yaw < 100:
+                    self.head.zangle = yaw_angle_deg - init_yaw
 
     def update_head(self):
         while True:
