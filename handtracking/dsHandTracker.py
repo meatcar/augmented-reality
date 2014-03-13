@@ -2,6 +2,7 @@
 
 import DepthSense as ds
 import numpy as np
+import copy as copy
 from SimpleCV import *
 import sys
 ds.initDepthSense()
@@ -55,16 +56,16 @@ while True:
             bb = b.boundingBox()
             box_center = b.centroid()
             hand = b.contour()
-            sorted_hand = copy(hand)
-            sorted_hand.sort(key=lambda x: x[1])
-            #box_point = [(top_x, top_y) for (top_x, top_y) in hand if top_y == min([y for (x,y) in hand])][0]
-            box_point = sorted_hand[0]
+            #sorted_hand = copy(hand)
+            #sorted_hand.sort(key=lambda x: x[1])
+            box_point = [(top_x, top_y) for (top_x, top_y) in hand if top_y == min([y for (x,y) in hand])][0]
+            #box_point = sorted_hand[0]
             #[depth.dl().circle(p, 15, Color.BLUE) for p in hand if (p[1] , box_point[1]-4))]
 
             #val = sum([1 if (int(abs(p[1] - box_point[1])) in [0,1,2]) else 0 for p in hand])
             val = sum([(abs(p[0] - box_point[0])) for p in hand if (abs(p[1] - box_point[1]) < 8)])
             if val > 150:
-                print val
+                #print val
                 box_center = None
                 depth.drawRectangle(bb[0], bb[1], bb[2], bb[3], color=Color.VIOLET)
                 continue

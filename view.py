@@ -17,6 +17,8 @@ class View:
         self.head = head
         self.shape = shape
         self.fps = 60
+	self.width = 0
+	self.height = 0
 
         glutInitDisplayMode(GLUT_RGBA)
         glutInitWindowSize(256,224)
