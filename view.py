@@ -4,18 +4,20 @@ from OpenGL.GLU import *
 from PIL import Image
 import numpy
 import math
+import sys
 
 import head
 import shape
 
 class View:
-    def __init__(self, head, shape):
+    def __init__(self, head, shape, dots):
         # GLUT initialization in program global, so initialize it on
         # the process level. It might be
         glutInit(sys.argv)
 
         self.head = head
         self.shape = shape
+        self.dots = dots
         self.fps = 60
 
         glutInitDisplayMode(GLUT_RGBA)
@@ -66,7 +68,11 @@ class View:
         glutPostRedisplay();
 
     def on_display(self):
-        self.draw()
+        try:
+            self.draw()
+        except Exception as e:
+            throw(e);
+            sys.exit(1)
 
     def draw(self):
 
@@ -152,7 +158,10 @@ class View:
         glRotatef(self.shape.yangle, 0, 1, 0)
         glRotatef(self.shape.xangle, 1, 0, 0)
 
-        self.draw_shape()
+        if self.shape is not None:
+            self.draw_shape()
+        if self.dots is not None:
+            self.draw_lines()
 
         glPopMatrix()
 
@@ -182,6 +191,16 @@ class View:
 
         glEnd();
 
+    def draw_lines(self):
+        glLineWidth(3);
+        #glColor3f(1, 0, 0);
+        point1 = self.dots.dots[0]
+        for point2 in self.dots.dots[1:]:
+            glBegin(GL_LINES)
+            glVertex3f(point1[0], point1[1], point1[2])
+            glVertex3f(point2[0], point2[1], point2[2])
+            glEnd()
+            point1 = point2
 
 if __name__ == "__main__":
     thing = View()
