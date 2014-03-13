@@ -1,4 +1,3 @@
-
 from OpenGL.GL import *
 from OpenGL.GLUT import *
 from OpenGL.GLU import *
@@ -41,12 +40,12 @@ class KeyController:
         if self.mousex is None:
             self.mousex = x
         else:
-            self.head.xangle += (self.mousex - x) / 100
+            self.head.xangle += (self.mousex - x) / 10000
             self.mousex = x
 
         if self.mousey is None:
             self.mousey = y
         else:
-            self.head.yangle += (self.mousey - y) / 100
+            self.head.yangle += (self.mousey - y) / 10000
             self.mousey = y
 
