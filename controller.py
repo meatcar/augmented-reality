@@ -20,6 +20,10 @@ class Controller(object):
     compass_bearing_filter_size = 10
     initial_angles_threshold = 50
 
+    init_pitch = 0
+    init_roll = 0
+    init_yaw = 0
+
     def __init__(self, head):
         self.phidget = PhidgetWrapper(self.on_data)
         self.head = head
@@ -50,10 +54,8 @@ class Controller(object):
             angles = [roll_angle, pitch_angle, yaw_angle];
             deg_angels = [yaw_angle*r, pitch_angle*r, roll_angle*r];
 
-            # if Controller.initial_angles != []:
-            #     deg_angels = [yaw_angle*r - Controller.initial_angles[0], pitch_angle*r - Controller.initial_angles[1], roll_angle*r-Controller.initial_angles[2]];
-
-            # print deg_angels;
+            # if deg_angels[0] - Controller.init_yaw < 100:
+            #         self.head.zangle = deg_angels[0] - Controller.init_yaw
 
             # Low pass filter.
             for i in list([0,1,2]):
@@ -92,25 +94,25 @@ class Controller(object):
             if len(Controller.initial_angles) < Controller.initial_angles_threshold:
                 Controller.initial_angles.append([pitch_angle_deg, roll_angle_deg, yaw_angle_deg])
             else:
-                init_pitch = 0
-                init_roll = 0
-                init_yaw = 0
+                Controller.init_pitch = 0
+                Controller.init_roll = 0
+                Controller.init_yaw = 0
 
                 for ia in Controller.initial_angles:
-                    init_pitch += ia[0]
-                    init_roll += ia[1]
-                    init_yaw += ia[2]
+                    Controller.init_pitch += ia[0]
+                    Controller.init_roll += ia[1]
+                    Controller.init_yaw += ia[2]
 
-                init_pitch /= Controller.initial_angles_threshold    
-                init_roll /= Controller.initial_angles_threshold
-                init_yaw /= Controller.initial_angles_threshold
+                Controller.init_pitch /= Controller.initial_angles_threshold    
+                Controller.init_roll /= Controller.initial_angles_threshold
+                Controller.init_yaw /= Controller.initial_angles_threshold
 
                 self.head.xangle = 0
                 self.head.yangle = 0
                 # self.head.xangle = pitch_angle_deg - init_pitch
                 # self.head.yangle = roll_angle_deg - init_roll
-                if yaw_angle_deg - init_yaw < 100:
-                    self.head.zangle = yaw_angle_deg - init_yaw
+                if yaw_angle_deg - Controller.init_yaw < 100:
+                    self.head.zangle = yaw_angle_deg - Controller.init_yaw
 
     def update_head(self):
         while True:
@@ -123,5 +125,5 @@ if __name__ == "__main__":
     c = Controller(h)
 
     while True:
-        time.sleep(1)
+        # time.sleep(1)
         print(h)
