@@ -1,4 +1,3 @@
-import sdl2
 
 from OpenGL.GL import *
 from OpenGL.GLUT import *
