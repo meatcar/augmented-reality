@@ -49,6 +49,11 @@ class Controller(object):
                         angles = [roll_angle, pitch_angle, yaw_angle];
                         deg_anglies = [yaw_angle*r, pitch_angle*r, roll_angle*r];
 
+                        self.head.xangle = pitch_angle
+                        self.head.yangle = roll_angle
+                        self.head.zangle = yaw_angle
+
+
                         # Low pass filter.
                         for i in list([0,1,2]):
                                 if abs(angles[i] - self.last_angles[i]) > 3:
@@ -86,9 +91,9 @@ class Controller(object):
                         if Controller.initial_angles == []:
                             Controller.initial_angles = [pitch_angle_deg, roll_angle_deg, yaw_angle_deg]
 
-                        self.head.xangle = pitch_angle_deg - Controller.initial_angles[0]
-                        self.head.yangle = roll_angle_deg - Controller.initial_angles[1]
-                        self.head.zangle = yaw_angle_deg - Controller.initial_angles[2]
+                        #self.head.xangle = pitch_angle_deg - Controller.initial_angles[0]
+                        #self.head.yangle = roll_angle_deg - Controller.initial_angles[1]
+                        #self.head.zangle = yaw_angle_deg - Controller.initial_angles[2]
 
         def update_head(self):
                 while True:
