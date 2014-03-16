@@ -10,7 +10,6 @@ class PhidgetWrapper(object):
 
     def __init__(self, data_callback):
         self.spatial = Spatial()
-
         self.callback = data_callback;
 
         # attach the event handlers.
@@ -23,6 +22,8 @@ class PhidgetWrapper(object):
             self.spatial.openPhidget()
             self.spatial.waitForAttach(1000)
             self.spatial.setDataRate(4)
+            self.spatial.setCompassCorrectionParameters(0.51236, 0.02523, 0.16216, 0.07254, 1.88718, 1.82735, 2.14068, -0.06096, -0.04644, -0.05897, 0.00783, -0.05211, 0.00870);
+
         except e:
             print("Error connecting to IMU, I cannot handle this. I will just go die now!", e)
             exit(1)
