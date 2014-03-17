@@ -84,10 +84,15 @@ static int16_t *vertexFullMap;
 static uint8_t *colourMap;
 static uint8_t *colourFullMap;
 
+// shared mem accel maps
+static float *accelMap;
+static float *accelFullMap;
+
 // internal map copies 
 static uint8_t colourMapClone[640*480*3];
 static uint16_t depthMapClone[320*240];
 static int16_t vertexMapClone[320*240*3];
+static float accelMapClone[3];
 
 int child_pid = 0;
 
@@ -100,6 +105,12 @@ static void dptrSwap (uint16_t **pa, uint16_t **pb){
 
 static void cptrSwap (uint8_t **pa, uint8_t **pb){
         uint8_t *temp = *pa;
+        *pa = *pb;
+        *pb = temp;
+}
+
+static void aptrSwap (float **pa, float **pb){
+        float *temp = *pa;
         *pa = *pb;
         *pb = temp;
 }
@@ -134,9 +145,11 @@ static void onNewColorSample(ColorNode node, ColorNode::NewSampleReceivedData da
 // New depth sample event handler
 static void onNewDepthSample(DepthNode node, DepthNode::NewSampleReceivedData data)
 {
+    // Depth 
     memcpy(depthMap, data.depthMap, dshmsz);
     dptrSwap(&depthMap, &depthFullMap);
 
+    // Verticies
     for(int i=0; i < dH; i++) {
         for(int j=0; j < dW; j++) {
             Vertex vertex = data.vertices[i*dW + j];
@@ -147,8 +160,14 @@ static void onNewDepthSample(DepthNode node, DepthNode::NewSampleReceivedData da
             
         }
     }
-
     vptrSwap(&vertexMap, &vertexFullMap);
+
+    // Acceleration
+    accelMap[0] = data.acceleration.x; 
+    accelMap[1] = data.acceleration.y; 
+    accelMap[2] = data.acceleration.z; 
+    aptrSwap(&accelMap, &accelFullMap);
+
     g_dFrames++;
 }
 
@@ -199,16 +218,18 @@ static void configureDepthNode()
     config.frameFormat = FRAME_FORMAT_QVGA;
     config.framerate = 30;
     config.mode = DepthNode::CAMERA_MODE_CLOSE_MODE;
-    //config.mode = DepthNode::CAMERA_MODE_LONG_RANGE;
     config.saturation = true;
+
     try 
     {
         g_context.requestControl(g_dnode,0);
         g_dnode.setConfidenceThreshold(100);
-        g_dnode.setConfiguration(config);
 
         g_dnode.setEnableDepthMap(true);
         g_dnode.setEnableVertices(true);
+        g_dnode.setEnableAccelerometer(true);
+
+        g_dnode.setConfiguration(config);
 
     }
     catch (ArgumentException& e)
@@ -266,9 +287,9 @@ static void configureColorNode()
         g_cnode.setWhiteBalance(4650);
         g_cnode.setSharpness(5);
         g_cnode.setWhiteBalanceAuto(true);
-        g_cnode.setConfiguration(config);
 
         g_cnode.setEnableColorMap(true);
+        g_cnode.setConfiguration(config);
     }
     catch (ArgumentException& e)
     {
@@ -390,6 +411,18 @@ static void initds()
         exit(1); 
     }
 
+    // shared mem double buffers
+    if ((accelMap = (float *) mmap(NULL, 3*sizeof(float), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
+        perror("mmap: cannot alloc shmem;"); 
+        exit(1); 
+    }
+
+    if ((accelFullMap = (float *) mmap(NULL, 3*sizeof(float), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
+        perror("mmap: cannot alloc shmem;"); 
+        exit(1); 
+    }
+
+    // shared mem double buffers
     if ((colourMap = (uint8_t *) mmap(NULL, cshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
         perror("mmap: cannot alloc shmem;"); 
         exit(1); 
@@ -400,6 +433,7 @@ static void initds()
         exit(1); 
     }
     
+    // shared mem double buffers
     if ((vertexMap = (int16_t *) mmap(NULL, vshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
         perror("mmap: cannot alloc shmem;"); 
         exit(1); 
@@ -409,6 +443,7 @@ static void initds()
         perror("mmap: cannot alloc shmem;"); 
         exit(1); 
     }
+
     // child goes into loop
     child_pid = fork();
     if (child_pid == 0) {
@@ -465,6 +500,14 @@ static PyObject *getDepth(PyObject *self, PyObject *args)
     return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, depthMapClone);
 }
 
+static PyObject *getAccel(PyObject *self, PyObject *args) 
+{
+    npy_intp dims[1] = {3};
+
+    memcpy(accelMapClone, accelFullMap, 3*sizeof(float));
+    return PyArray_SimpleNewFromData(1, dims, NPY_FLOAT32, accelMapClone);
+}
+
 static PyObject *getVertex(PyObject *self, PyObject *args) 
 {
     npy_intp dims[3] = {dH, dW, 3};
@@ -488,6 +531,7 @@ static PyMethodDef DepthSenseMethods[] = {
     {"getDepthMap",  getDepth, METH_VARARGS, "Get Depth Map"},
     {"getColourMap",  getColour, METH_VARARGS, "Get Colour Map"},
     {"getVertices",  getVertex, METH_VARARGS, "Get Vertex Map"},
+    {"getAcceleration",  getAccel, METH_VARARGS, "Get Acceleration"},
     {"initDepthSense",  initDepthS, METH_VARARGS, "Init DepthSense"},
     {"killDepthSense",  killDepthS, METH_VARARGS, "Kill DepthSense"},
     {NULL, NULL, 0, NULL}        /* Sentinel */

@@ -24,5 +24,6 @@ while True:
     iS = Image(image.transpose([1,0,2]))
     #iS.show()
 
+    print ds.getAcceleration()
     iV.sideBySide(iD).show()
 
