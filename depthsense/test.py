@@ -17,9 +17,9 @@ while True:
     #iS = Image(image.transpose([1,0,2]))
     #iS.sideBySide(iD).show()
     #iS.show()
-    #dblobs = iD.findBlobs()
-    #if dblobs:
-    #    dblobs.draw()
+    dblobs = iD.findBlobs()
+    if dblobs:
+        dblobs.draw()
     c+=1
     iD.show()
     if c > 10000:
