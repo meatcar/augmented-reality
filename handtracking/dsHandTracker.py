@@ -2,8 +2,11 @@
 
 import DepthSense as ds
 import numpy as np
+import copy as copy
 from SimpleCV import *
 import sys
+from time import sleep
+
 ds.initDepthSense()
 #disp = Display(flags = pg.FULLSCREEN)
 disp = Display()
@@ -25,11 +28,11 @@ while True:
     depth = Image(depth)
     depth = depth.invert()
  
-    # filter out region of depth below given colour distance (minimizes blob confusion)
-    #depth.stretch(0,150)
-    #depth = depth - depth.colorDistance((200,200,200))
-    dblobs = depth.findBlobs(minsize=2000, maxsize=14000)
-    #dblobs = depth.findBlobs(threshval=(200,200,200)) #, threshblocksize=1000,appx_level=5)
+    #vertex = ds.getVertices()
+    #vertex = vertex.transpose([1,0,2])
+
+    #dblobs = depth.findBlobs(minsize=2000, maxsize=14000)
+    dblobs = depth.findBlobs(minsize=2000)
  
     box_center = None
     box = None
@@ -55,22 +58,24 @@ while True:
             bb = b.boundingBox()
             box_center = b.centroid()
             hand = b.contour()
-            sorted_hand = copy(hand)
-            sorted_hand.sort(key=lambda x: x[1])
-            #box_point = [(top_x, top_y) for (top_x, top_y) in hand if top_y == min([y for (x,y) in hand])][0]
-            box_point = sorted_hand[0]
-            #[depth.dl().circle(p, 15, Color.BLUE) for p in hand if (p[1] , box_point[1]-4))]
+            #sorted_hand = copy(hand)
+            #sorted_hand.sort(key=lambda x: x[1])
+            box_point = [(top_x, top_y) for (top_x, top_y) in hand if top_y == min([y for (x,y) in hand])][0]
+            #box_point = sorted_hand[0]
 
-            #val = sum([1 if (int(abs(p[1] - box_point[1])) in [0,1,2]) else 0 for p in hand])
             val = sum([(abs(p[0] - box_point[0])) for p in hand if (abs(p[1] - box_point[1]) < 8)])
             if val > 150:
-                print val
+                #print val
                 box_center = None
                 depth.drawRectangle(bb[0], bb[1], bb[2], bb[3], color=Color.VIOLET)
                 continue
+
             depth.dl().circle(box_point, 20, Color.RED)
             depth.dl().polygon(hand, filled=True, color=Color.YELLOW)
             depth.drawRectangle(bb[0], bb[1], bb[2], bb[3], color=Color.GREEN)
+
+            # points that opengl can use
+            #print vertex[(box_point[0], box_point[1])]
  
             # if two hands are found in the scene, record point information
             #counter+=1
@@ -84,7 +89,13 @@ while True:
             #        continue
  
  
-    
+    if box_center == None:
+        bigb = dblobs[-1]
+        bigbb = bigb.boundingBox()
+        cropped = img.crop(bigbb)
+        cropped.save(disp)
+        sleep(2)
+        depth.dl().polygon(bigb.contour(), color=Color.VIOLET)
     # append new point to the point array
     if (len(points) > 0) and (box_center):
         x_delta = abs(box_point[0] - points[-1][0])
