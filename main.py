@@ -40,8 +40,8 @@ if __name__ == "__main__":
 
     view = View(head=head, shape=shape, dots=dots)
 
-    #controller = Controller(head)
-    keycontroller = KeyController(head, shape)
+    controller = Controller(head)
+    #keycontroller = KeyController(head, shape)
 
     view.run()
 
