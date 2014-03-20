@@ -3,6 +3,7 @@ from OpenGL.GLUT import *
 from OpenGL.GLU import *
 from PIL import Image
 import numpy
+from math import sin,cos,tan,radians
 import math
 import sys
 
@@ -19,8 +20,8 @@ class View:
         self.shape = shape
         self.dots = dots
         self.fps = 60
-	self.width = 0
-	self.height = 0
+        self.width = 0
+        self.height = 0
 
         glutInitDisplayMode(GLUT_RGBA)
         glutInitWindowSize(256,224)
@@ -73,11 +74,10 @@ class View:
         try:
             self.draw()
         except Exception as e:
-            throw(e);
+            print(e)
             sys.exit(1)
 
     def draw(self):
-
         glViewport(0, 0, self.width//2, self.height)
 
         glClearDepth(1) # just for completeness
@@ -130,9 +130,13 @@ class View:
                 self.head.z + 1,
 
                 # what we're looking at
-                math.sin(self.head.xangle) * math.cos(self.head.zangle * -1) * (distance ** 2),
-                math.cos(self.head.zangle) * math.sin(self.head.zangle * 1) * (distance ** 2),
-                math.sin(self.head.xangle) * distance - 1,
+                cos(radians(self.head.xangle)) * distance,
+                cos(radians(self.head.yangle)) * distance,
+                -1*cos(radians(self.head.zangle)) * distance,
+
+                #math.sin(self.head.xangle) * math.cos(self.head.zangle * -1) * (distance ** 2),
+                #math.cos(self.head.zangle) * math.sin(self.head.zangle * 1) * (distance ** 2),
+                #math.sin(self.head.xangle) * distance - 1,
 
                 #math.sin(self.head.xangle)*distance,
                 #-1*math.sin(self.head.yangle)*math.cos(self.head.xangle)*distance,
@@ -160,8 +164,8 @@ class View:
         glRotatef(self.shape.yangle, 0, 1, 0)
         glRotatef(self.shape.xangle, 1, 0, 0)
 
-        if self.shape is not None:
-            self.draw_shape()
+        #if self.shape is not None:
+            #self.draw_shape()
         if self.dots is not None:
             self.draw_lines()
 
@@ -199,8 +203,12 @@ class View:
         point1 = self.dots.dots[0]
         for point2 in self.dots.dots[1:]:
             glBegin(GL_LINES)
-            glVertex3f(point1[0], point1[1], point1[2])
-            glVertex3f(point2[0], point2[1], point2[2])
+            glVertex3f(self.head.x + point1[0]/100,
+                       self.head.y + point1[1]/100,
+                       point1[2]/100*-1)
+            glVertex3f(self.head.x + point2[0]/100,
+                       self.head.y + point2[1]/100,
+                       point2[2]/100*-1)
             glEnd()
             point1 = point2
 
