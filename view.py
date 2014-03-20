@@ -142,6 +142,10 @@ class View:
                 #-1*math.sin(self.head.yangle)*math.cos(self.head.xangle)*distance,
                 #-1*math.cos(self.head.yangle)*math.cos(self.head.xangle)*distance - 1,
 
+                #math.cos(self.head.zangle)*math.cos(self.head.yangle),
+                #math.sin(self.head.zangle)*math.cos(self.head.yangle),
+                #math.sin(self.head.yangle) - 1,
+
                 # the up vector in the final view.
                 0, 1, 0
                 )

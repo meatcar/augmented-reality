@@ -2,6 +2,7 @@ from SimpleCV import *
 #disp = Display(flags = pg.FULLSCREEN)
 disp = Display()
 k = Kinect()
+
 points = []
 squares = []
 

@@ -70,18 +70,29 @@ static int32_t cH = 480;
 
 int dshmsz = dW*dH*sizeof(uint16_t);
 int cshmsz = cW*cH*sizeof(uint8_t);
+int vshmsz = dW*dH*sizeof(int16_t);
 
 // shared mem depth maps
 static uint16_t *depthMap;
 static uint16_t *depthFullMap;
 
+// shared mem depth maps
+static int16_t *vertexMap;
+static int16_t *vertexFullMap;
+
 // shared mem colour maps
 static uint8_t *colourMap;
 static uint8_t *colourFullMap;
 
+// shared mem accel maps
+static float *accelMap;
+static float *accelFullMap;
+
 // internal map copies 
 static uint8_t colourMapClone[640*480*3];
 static uint16_t depthMapClone[320*240];
+static int16_t vertexMapClone[320*240*3];
+static float accelMapClone[3];
 
 int child_pid = 0;
 
@@ -94,6 +105,18 @@ static void dptrSwap (uint16_t **pa, uint16_t **pb){
 
 static void cptrSwap (uint8_t **pa, uint8_t **pb){
         uint8_t *temp = *pa;
+        *pa = *pb;
+        *pb = temp;
+}
+
+static void aptrSwap (float **pa, float **pb){
+        float *temp = *pa;
+        *pa = *pb;
+        *pb = temp;
+}
+
+static void vptrSwap (int16_t **pa, int16_t **pb){
+        int16_t *temp = *pa;
         *pa = *pb;
         *pb = temp;
 }
@@ -122,8 +145,29 @@ static void onNewColorSample(ColorNode node, ColorNode::NewSampleReceivedData da
 // New depth sample event handler
 static void onNewDepthSample(DepthNode node, DepthNode::NewSampleReceivedData data)
 {
+    // Depth 
     memcpy(depthMap, data.depthMap, dshmsz);
     dptrSwap(&depthMap, &depthFullMap);
+
+    // Verticies
+    for(int i=0; i < dH; i++) {
+        for(int j=0; j < dW; j++) {
+            Vertex vertex = data.vertices[i*dW + j];
+            vertexMap[i*dW*3 + j*3 + 0] = vertex.x;
+            vertexMap[i*dW*3 + j*3 + 1] = vertex.y;
+            vertexMap[i*dW*3 + j*3 + 2] = vertex.z;
+            //cout << vertex.x << vertex.y << vertex.z << endl;
+            
+        }
+    }
+    vptrSwap(&vertexMap, &vertexFullMap);
+
+    // Acceleration
+    accelMap[0] = data.acceleration.x; 
+    accelMap[1] = data.acceleration.y; 
+    accelMap[2] = data.acceleration.z; 
+    aptrSwap(&accelMap, &accelFullMap);
+
     g_dFrames++;
 }
 
@@ -174,16 +218,19 @@ static void configureDepthNode()
     config.frameFormat = FRAME_FORMAT_QVGA;
     config.framerate = 30;
     config.mode = DepthNode::CAMERA_MODE_CLOSE_MODE;
-    //config.mode = DepthNode::CAMERA_MODE_LONG_RANGE;
     config.saturation = true;
-    g_dnode.setEnableDepthMap(true);
-    //g_dnode.setEnableConfidenceMap(true);
 
     try 
     {
         g_context.requestControl(g_dnode,0);
         g_dnode.setConfidenceThreshold(100);
+
+        g_dnode.setEnableDepthMap(true);
+        g_dnode.setEnableVertices(true);
+        g_dnode.setEnableAccelerometer(true);
+
         g_dnode.setConfiguration(config);
+
     }
     catch (ArgumentException& e)
     {
@@ -232,7 +279,6 @@ static void configureColorNode()
     try 
     {
         g_context.requestControl(g_cnode,0);
-
         g_cnode.setBrightness(0);
         g_cnode.setContrast(5);
         g_cnode.setSaturation(5);
@@ -241,6 +287,8 @@ static void configureColorNode()
         g_cnode.setWhiteBalance(4650);
         g_cnode.setSharpness(5);
         g_cnode.setWhiteBalanceAuto(true);
+
+        g_cnode.setEnableColorMap(true);
         g_cnode.setConfiguration(config);
     }
     catch (ArgumentException& e)
@@ -272,8 +320,6 @@ static void configureColorNode()
         printf("TimeoutException\n");
     }
     
-    // must be done at the end to support usb3.0
-    g_cnode.setEnableColorMap(true);
 }
 
 /*----------------------------------------------------------------------------*/
@@ -345,6 +391,9 @@ extern "C" {
             munmap(depthFullMap, dshmsz);
             munmap(colourMap, cshmsz*3);
             munmap(colourFullMap, cshmsz*3);
+            munmap(vertexMap, vshmsz*3);
+            munmap(vertexFullMap, vshmsz*3);
+
 
     }
 }
@@ -362,12 +411,35 @@ static void initds()
         exit(1); 
     }
 
+    // shared mem double buffers
+    if ((accelMap = (float *) mmap(NULL, 3*sizeof(float), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
+        perror("mmap: cannot alloc shmem;"); 
+        exit(1); 
+    }
+
+    if ((accelFullMap = (float *) mmap(NULL, 3*sizeof(float), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
+        perror("mmap: cannot alloc shmem;"); 
+        exit(1); 
+    }
+
+    // shared mem double buffers
     if ((colourMap = (uint8_t *) mmap(NULL, cshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
         perror("mmap: cannot alloc shmem;"); 
         exit(1); 
     }
 
     if ((colourFullMap = (uint8_t *) mmap(NULL, cshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
+        perror("mmap: cannot alloc shmem;"); 
+        exit(1); 
+    }
+    
+    // shared mem double buffers
+    if ((vertexMap = (int16_t *) mmap(NULL, vshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
+        perror("mmap: cannot alloc shmem;"); 
+        exit(1); 
+    }
+
+    if ((vertexFullMap = (int16_t *) mmap(NULL, vshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
         perror("mmap: cannot alloc shmem;"); 
         exit(1); 
     }
@@ -428,6 +500,21 @@ static PyObject *getDepth(PyObject *self, PyObject *args)
     return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, depthMapClone);
 }
 
+static PyObject *getAccel(PyObject *self, PyObject *args) 
+{
+    npy_intp dims[1] = {3};
+
+    memcpy(accelMapClone, accelFullMap, 3*sizeof(float));
+    return PyArray_SimpleNewFromData(1, dims, NPY_FLOAT32, accelMapClone);
+}
+
+static PyObject *getVertex(PyObject *self, PyObject *args) 
+{
+    npy_intp dims[3] = {dH, dW, 3};
+    memcpy(vertexMapClone, vertexFullMap, vshmsz*3);
+    return PyArray_SimpleNewFromData(3, dims, NPY_INT16, vertexMapClone);
+}
+
 static PyObject *initDepthS(PyObject *self, PyObject *args)
 {
     initds();
@@ -443,6 +530,8 @@ static PyObject *killDepthS(PyObject *self, PyObject *args)
 static PyMethodDef DepthSenseMethods[] = {
     {"getDepthMap",  getDepth, METH_VARARGS, "Get Depth Map"},
     {"getColourMap",  getColour, METH_VARARGS, "Get Colour Map"},
+    {"getVertices",  getVertex, METH_VARARGS, "Get Vertex Map"},
+    {"getAcceleration",  getAccel, METH_VARARGS, "Get Acceleration"},
     {"initDepthSense",  initDepthS, METH_VARARGS, "Init DepthSense"},
     {"killDepthSense",  killDepthS, METH_VARARGS, "Kill DepthSense"},
     {NULL, NULL, 0, NULL}        /* Sentinel */
@@ -468,9 +557,7 @@ int main(int argc, char* argv[])
     /* Add a static module */
     initDepthSense();
 
-    //thread worker(&init);
-    //printf("HERE\n");
-    //worker.join();
+    //initds(); //for testing
     
     return 0;
 }
