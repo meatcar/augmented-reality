@@ -385,6 +385,9 @@ static void onDeviceDisconnected(Context context, Context::DeviceRemovedData dat
 
 extern "C" {
     static void killds(){
+        if (child_pid == 0) {
+            printf("hi");
+        }
         if (child_pid !=0)
             kill(child_pid, SIGTERM);
             munmap(depthMap, dshmsz);
@@ -444,8 +447,8 @@ static void initds()
         exit(1); 
     }
 
-    // child goes into loop
     child_pid = fork();
+    // child goes into loop
     if (child_pid == 0) {
         g_context = Context::create("localhost");
         g_context.deviceAddedEvent().connect(&onDeviceConnected);

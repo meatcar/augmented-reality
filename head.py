@@ -6,8 +6,8 @@ class Head:
         self.eye_distance = eye_distance
         self.fov = fov
 
-        self.xangle = 0
-        self.yangle = 0
+        self.xangle = 90
+        self.yangle = 90
         self.zangle = 0
 
         self.rot_matrix = None

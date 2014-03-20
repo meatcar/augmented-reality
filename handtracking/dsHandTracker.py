@@ -32,11 +32,12 @@ while True:
     #vertex = vertex.transpose([1,0,2])
 
     #dblobs = depth.findBlobs(minsize=2000, maxsize=14000)
-    dblobs = depth.findBlobs(minsize=2000)
+    dblobs = depth.findBlobs(minsize=2000, maxsize=(320*240/2))
  
     box_center = None
     box = None
     box_point = None
+    possible_hands = []
     z_val = 0
     box_area = 0
     counter = 0
@@ -50,13 +51,12 @@ while True:
         # filter out region of depth above given colour distance (focuses our interest)
         if ((depth[b.centroid()] < (200,200,200)) \
                 and (depth[b.centroid()] > (40,40, 40)) \
-                and b.rectangleDistance() > 0.18):
+                and b.rectangleDistance() > 0.19):
             #print depth[b.centroid()], b.area(), b.rectangleDistance()
 
             old_point = box_point
 
             bb = b.boundingBox()
-            box_center = b.centroid()
             hand = b.contour()
             #sorted_hand = copy(hand)
             #sorted_hand.sort(key=lambda x: x[1])
@@ -66,10 +66,11 @@ while True:
             val = sum([(abs(p[0] - box_point[0])) for p in hand if (abs(p[1] - box_point[1]) < 8)])
             if val > 150:
                 #print val
-                box_center = None
-                depth.drawRectangle(bb[0], bb[1], bb[2], bb[3], color=Color.VIOLET)
+                depth.drawRectangle(bb[0], bb[1], bb[2], bb[3], color=Color.ORANGE)
+                #possible_hands.append(b)
                 continue
 
+            box_center = b.centroid()
             depth.dl().circle(box_point, 20, Color.RED)
             depth.dl().polygon(hand, filled=True, color=Color.YELLOW)
             depth.drawRectangle(bb[0], bb[1], bb[2], bb[3], color=Color.GREEN)
@@ -89,13 +90,41 @@ while True:
             #        continue
  
  
+    # search within the colour image if no hand found
     if box_center == None:
-        bigb = dblobs[-1]
-        bigbb = bigb.boundingBox()
-        cropped = img.crop(bigbb)
-        cropped.save(disp)
-        sleep(2)
-        depth.dl().polygon(bigb.contour(), color=Color.VIOLET)
+        possible_hands.append(dblobs[-1])
+        bb = dblobs[-1].boundingBox()
+        depth.drawRectangle(bb[0], bb[1], bb[2], bb[3], color=Color.YELLOW)
+        for bigb in possible_hands:
+            
+            bigbb = bigb.boundingBox()
+            x = bigbb[0]/2 + 20
+            y = bigbb[1]/2 + 20
+            
+            if x < 0:
+                x = 0
+            elif x > 320:
+                x = 320 - 20
+            if y < 0:
+                y = 0
+            elif y > 240:
+                y = 240 - 20
+            
+            cropped = img.crop(x, y, bigbb[2]*2, bigbb[3]*2)
+            hands = cropped.findSkintoneBlobs(minsize=1000)
+            if not hands:
+                continue
+
+            for hand in hands:
+                print hand.rectangleDistance(), hand.area()
+                if hand.rectangleDistance() < 0.1:
+                    continue
+                hand = [(px/2 + bigbb[0]/2, py/2 + bigbb[1]/2) for (px, py) in hand.contour()]
+                col_point = [(tpx, tpy) for (tpx, tpy) in hand if tpy == min([y for (x,y) in hand])][0]
+                depth.dl().polygon(hand, filled=True, color=Color.LEGO_BLUE)
+                depth.dl().circle(col_point, 20, Color.RED)
+                #depth.dl().polygon(bigb.contour(), color=Color.HOTPINK)
+
     # append new point to the point array
     if (len(points) > 0) and (box_center):
         x_delta = abs(box_point[0] - points[-1][0])

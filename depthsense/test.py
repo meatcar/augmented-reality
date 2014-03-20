@@ -23,7 +23,18 @@ while True:
     image = image[:,:,::-1]
     iS = Image(image.transpose([1,0,2]))
     #iS.show()
+<<<<<<< HEAD
+    dblobs = iD.findBlobs()
+    if dblobs:
+        dblobs.draw()
+    c+=1
+    iD.show()
+    if c > 10000:
+        ds.killDepthSense()
+        break
+=======
 
     print ds.getAcceleration()
     iV.sideBySide(iD).show()
+>>>>>>> 8b745c989624910f1f9076d469def7b7af075fd4
 
