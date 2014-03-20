@@ -89,9 +89,9 @@ class Controller(object):
             self.pitch = po;
 
         self.head.xangle = 0;
-        self.head.zangle = (-1)*self.total_angle
-        self.head.yangle = self.pitch
-
+        self.head.yangle = (-2)*math.radians(self.total_angle) - math.radians(45) # on xy plane for gl;
+        self.head.zangle = math.radians(self.pitch) # on zx plane for gl;
+ 
     def update_head(self):
         while True:
             if len(Controller.imu_measurements["acc"][0]) >= 50:
@@ -104,5 +104,5 @@ if __name__ == "__main__":
     c = Controller(h)
 
     while True:
-        time.sleep(1)
+        time.sleep(0.02)
         print(h)

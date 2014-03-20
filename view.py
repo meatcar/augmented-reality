@@ -144,7 +144,7 @@ class View:
 
                 math.cos(self.head.zangle)*math.cos(self.head.yangle),
                 math.sin(self.head.zangle)*math.cos(self.head.yangle),
-                math.sin(self.head.yangle) - 1,
+                math.sin(self.head.yangle),
 
                 # the up vector in the final view.
                 0, 1, 0

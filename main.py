@@ -2,8 +2,8 @@ from head import Head
 from shape import Shape
 from view import View
 from dots import Dots
-#from controller import Controller
-from key_controller import KeyController
+from controller import Controller
+#from key_controller import KeyController
 
 if __name__ == "__main__":
     head = Head()
