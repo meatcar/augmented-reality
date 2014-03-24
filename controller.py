@@ -21,10 +21,17 @@ class Controller(object):
 
     pitch = 0
     pitch_old = 0
-    first = -1000
+
+    roll = 0
+    roll_old = 10
+
+    # stores roll pitch yaw initial values.
+    first = [-1000, -1000, -1000]
     imu_measurements = {"acc" : [], "gyr" : [], "mag" : [], "time" : []}
     
     def __init__(self, head):
+        ds.initDepthSense()
+
         self.phidget = PhidgetWrapper(self.on_data)
         self.head = head
 
@@ -86,12 +93,17 @@ class Controller(object):
 
         # record the first value as a threshold. 
         # All the values after will be adjusted based on this.
-        if self.first == -1000:
-            self.first = round(pitch_angle*r,1);
+        if self.first[0] == -1000:
+            self.first = [0, 0, 0]
+            self.first[0] = roll_angle;
+            self.first[1] = round(pitch_angle*r,1);
+            self.first[2] = 0   
 
         # compute the current pitch
-        self.pitch = round(pitch_angle*r,1) - self.first;
+        self.pitch = round(pitch_angle*r,1)  - self.first[1];
+        # self.roll = roll_angle - self.first[0]
 
+        # self.roll = self.roll * 0.025
 
         # The following code compensates for simultaneous movements in 
         # pitch and YAW which would lead to incorrect measurement of 
@@ -102,6 +114,17 @@ class Controller(object):
 
         _heading = self.heading
         _heading_old = self.heading_old
+
+        _roll = self.roll
+        _roll_old = self.roll_old
+
+        # print self.roll
+
+        # print abs(_roll - _roll_old)
+
+        # Only update roll angle if the difference is more than 0.1
+        # if abs(_roll - _roll_old) < 0.15:
+        #     self.roll_old = self.roll
 
         # If changes in heading are small but changes in pitch are significant
         # only update the pitch.
@@ -122,7 +145,7 @@ class Controller(object):
             self.pitch = _pitch_old;
 
         self.head.xangle = 0;
-        self.head.yangle = (-2)*math.radians(self.heading) - math.radians(45) # on xy plane for gl;
+        self.head.yangle = (-1)*math.radians(self.heading) - math.radians(45) # on xy plane for gl;
         self.head.zangle = math.radians(self.pitch) # on zx plane for gl;
  
     def update_head(self):
@@ -130,7 +153,10 @@ class Controller(object):
             if len(Controller.imu_measurements["acc"]) >= 6:
                 data = copy(Controller.imu_measurements)
                 self.process_data(data["acc"], data["gyr"], data["mag"], None);
-                Controller.imu_measurements = {"acc" : [], "gyr" : [], "mag" : [], "time" : []}
+                Controller.imu_measurements["acc"] = Controller.imu_measurements["acc"][1:]
+                Controller.imu_measurements["gyr"] = Controller.imu_measurements["gyr"][1:]
+                Controller.imu_measurements["mag"] = Controller.imu_measurements["mag"][1:]
+                Controller.imu_measurements["time"] = Controller.imu_measurements["time"][1:]
 
 if __name__ == "__main__":
     h = Head()
