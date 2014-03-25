@@ -1,3 +1,4 @@
+#!/bin/python
 
 import sys
 import time
@@ -12,117 +13,25 @@ from collections import deque
 from phidgetwrapper import PhidgetWrapper
 
 class Controller(object):
-<<<<<<< HEAD
-        head = None
-        imu_measurements = {"acc" : [], "gyr" : [], "time" : [], "mag" : []}
-        last_angles = [0, 0, 0]
-        compass_bearing_filter = deque([])
-        compass_bearing_filter_size = 10
-        initial_angles = []
 
-        def __init__(self, head):
-                self.phidget = PhidgetWrapper(self.on_data)
-                self.head = head
-
-                self.t = Thread(target=self.update_head)
-                self.t.daemon = True
-                self.t.start()
-
-        def on_data(self, acc, gyr, mag, microseconds):
-                Controller.imu_measurements["acc"].append(acc)
-                Controller.imu_measurements["gyr"].append(gyr)
-                Controller.imu_measurements["mag"].append(mag)
-                Controller.imu_measurements["time"].append(microseconds)
-
-        def process_data(self, acc, gyr, mag, del_t):
-                n = len(acc)
-                r = (180.0/math.pi); # 1 radian.
-
-                for i in range(n):
-                        gravity = [acc[i][0], acc[i][1], acc[i][2]];
-                        mag_field = [mag[i][0], mag[i][1], mag[i][2]];
-
-                        roll_angle = math.atan2(gravity[1], gravity[2]);
-                        pitch_angle = math.atan(-gravity[0]/((gravity[1]*math.sin(roll_angle)) + (gravity[2] * math.cos(roll_angle))));
-                        yaw_angle = math.atan2((mag_field[2]*math.sin(roll_angle))-(mag_field[1]*math.cos(roll_angle)),
-                                (mag_field[0]*math.cos(pitch_angle))+(mag_field[1]*math.sin(pitch_angle)*math.sin(roll_angle))+(mag_field[2]*math.sin(pitch_angle)*math.cos(roll_angle)));
-
-                        angles = [roll_angle, pitch_angle, yaw_angle];
-                        deg_anglies = [yaw_angle*r, pitch_angle*r, roll_angle*r];
-
-                        self.head.xangle = pitch_angle
-                        self.head.yangle = roll_angle
-                        self.head.zangle = yaw_angle
-
-
-                        # Low pass filter.
-                        for i in list([0,1,2]):
-                                if abs(angles[i] - self.last_angles[i]) > 3:
-                                        for compass_bearing in self.compass_bearing_filter:
-                                                if angles[i] > self.last_angles[i]: 
-                                                        compass_bearing[i] += 360 * r;
-                                                else:
-                                                        compass_bearing[i] -= 360 * r;
-
-                        self.last_angles = copy(angles);
-
-                        self.compass_bearing_filter.append(copy(angles));
-
-                        if self.compass_bearing_filter.__len__() > self.compass_bearing_filter_size:
-                                self.compass_bearing_filter.reverse();
-                                self.compass_bearing_filter.pop();
-                                self.compass_bearing_filter.reverse();
-
-                        yaw_angle = pitch_angle = roll_angle = 0;
-
-                        for compass_bearing in self.compass_bearing_filter:
-                                roll_angle += compass_bearing[0];
-                                pitch_angle += compass_bearing[1];
-                                yaw_angle += compass_bearing[2];
-
-                        l = float(self.compass_bearing_filter.__len__())
-
-                        yaw_angle /= l
-                        pitch_angle /= l
-                        roll_angle /= l
-                        yaw_angle_deg = yaw_angle * r;
-                        pitch_angle_deg = pitch_angle * r
-                        roll_angle_deg = roll_angle * r
-                        
-                        if Controller.initial_angles == []:
-                            Controller.initial_angles = [pitch_angle_deg, roll_angle_deg, yaw_angle_deg]
-
-                        #self.head.xangle = pitch_angle_deg - Controller.initial_angles[0]
-                        #self.head.yangle = roll_angle_deg - Controller.initial_angles[1]
-                        #self.head.zangle = yaw_angle_deg - Controller.initial_angles[2]
-
-        def update_head(self):
-                while True:
-                        data = copy(Controller.imu_measurements)
-                        self.process_data(data["acc"], data["gyr"], data["mag"], None);
-                        Controller.imu_measurements = {"acc" : [], "gyr" : [], "time" : [], "mag" : []}    
-
-if __name__ == "__main__":
-        h = Head()
-        c = Controller(h)
-
-        while True:
-                time.sleep(1)
-                print(h)
-=======
     head = None
-    imu_measurements = {"acc" : [], "gyr" : [], "time" : [], "mag" : []}
-    initial_angles = []
-    last_angles = [0, 0, 0]
-    compass_bearing_filter = deque([])
-    compass_bearing_filter_size = 10
-    initial_angles_threshold = 50
 
-    init_pitch = 0
-    init_roll = 0
-    init_yaw = 0
+    heading = 0
+    heading_old = 0
 
+    pitch = 0
+    pitch_old = 0
+
+    roll = 0
+    roll_old = 10
+
+    # stores roll pitch yaw initial values.
+    first = [-1000, -1000, -1000]
+    imu_measurements = {"acc" : [], "gyr" : [], "mag" : [], "time" : []}
+    
     def __init__(self, head):
+        ds.initDepthSense()
+
         self.phidget = PhidgetWrapper(self.on_data)
         self.head = head
 
@@ -137,92 +46,122 @@ if __name__ == "__main__":
         Controller.imu_measurements["time"].append(microseconds)
 
     def process_data(self, acc, gyr, mag, del_t):
-        n = min(len(acc), len(mag))
-        r = (180.0/math.pi); # 1 radian.
+        delta = 2;
 
-        for i in range(n):
-            gravity = [acc[i][0], acc[i][1], acc[i][2]];
-            mag_field = [mag[i][0], mag[i][1], mag[i][2]];
+        # n x 3 matrix.
+        acc = np.matrix(acc)
+        
+        # n x 3 matrix.
+        gyr = np.matrix(gyr)
 
-            roll_angle = math.atan2(gravity[1], gravity[2]);
-            pitch_angle = math.atan(-gravity[0]/((gravity[1]*math.sin(roll_angle)) + (gravity[2] * math.cos(roll_angle))));
-            yaw_angle = math.atan2((mag_field[2]*math.sin(roll_angle))-(mag_field[1]*math.cos(roll_angle)),
-                (mag_field[0]*math.cos(pitch_angle))+(mag_field[1]*math.sin(pitch_angle)*math.sin(roll_angle))+(mag_field[2]*math.sin(pitch_angle)*math.cos(roll_angle)));
+        # mean acceleration per axis for this data window.
+        acc_z = np.mean(acc[0:,0])
+        acc_x = np.mean(acc[0:,1])
+        acc_y = np.mean(acc[0:,2])
 
-            angles = [roll_angle, pitch_angle, yaw_angle];
-            deg_angels = [yaw_angle*r, pitch_angle*r, roll_angle*r];
+        # mean gyro reading in the x axis. 
+        # this is used to compute the heading (YAW).
+        # 
+        # ignore the first value in gyro data, and take the mean to apply
+        # simple filtering. 
+        # TODO: try better smoothing techniques 
+        # - exponential smoothing, 
+        # - moving average
+        # 
+        # TODO: need to compensate for drift.
+        gyr_z = np.mean(gyr[1:,0]) 
 
-            # if deg_angels[0] - Controller.init_yaw < 100:
-            #         self.head.zangle = deg_angels[0] - Controller.init_yaw
+        # gravity measured by acceleration due to gravity.
+        gravity = [acc_x, acc_y, acc_z]
+        
+        # 12 samples accumulate about every 0.05 seconds.
+        # compute to total change in YAW by integrating points over time.
+        # 
+        # TOOD: The current implementation uses a simple filtering of the
+        # gyro data. A threshold of 0.8 is chosen. Only is the angular
+        # rate of change is greater than the threshold, will there be
+        # a change in the total angle. 
+        if abs(gyr_z) > 0.8:
+            self.heading = self.heading + gyr_z*0.025;
 
-            # Low pass filter.
-            for i in list([0,1,2]):
-                if abs(angles[i] - self.last_angles[i]) > 3:
-                    for compass_bearing in self.compass_bearing_filter:
-                        if angles[i] > self.last_angles[i]: 
-                            compass_bearing[i] += 360 * r;
-                        else:
-                            compass_bearing[i] -= 360 * r;
+        # Compute the pitch and roll using formula's on the phidgets website.
+        roll_angle = math.atan2(gravity[1], gravity[2]);
+        pitch_angle = math.atan(-gravity[0]/((gravity[1]*math.sin(roll_angle)) + (gravity[2] * math.cos(roll_angle))));
 
-            self.last_angles = copy(angles);
+        # Scaling factor for producing reasonable degree numbers.
+        r = 30*math.pi/180.0 * 100
 
-            self.compass_bearing_filter.append(copy(angles));
+        # record the first value as a threshold. 
+        # All the values after will be adjusted based on this.
+        if self.first[0] == -1000:
+            self.first = [0, 0, 0]
+            self.first[0] = roll_angle;
+            self.first[1] = round(pitch_angle*r,1);
+            self.first[2] = 0   
 
-            if self.compass_bearing_filter.__len__() > self.compass_bearing_filter_size:
-                self.compass_bearing_filter.reverse();
-                self.compass_bearing_filter.pop();
-                self.compass_bearing_filter.reverse();
+        # compute the current pitch
+        self.pitch = round(pitch_angle*r,1)  - self.first[1];
+        # self.roll = roll_angle - self.first[0]
 
-            yaw_angle = pitch_angle = roll_angle = 0;
+        # self.roll = self.roll * 0.025
 
-            for compass_bearing in self.compass_bearing_filter:
-                roll_angle += compass_bearing[0];
-                pitch_angle += compass_bearing[1];
-                yaw_angle += compass_bearing[2];
+        # The following code compensates for simultaneous movements in 
+        # pitch and YAW which would lead to incorrect measurement of 
+        # angles in both movements.
 
-            l = float(self.compass_bearing_filter.__len__())
+        _pitch     = self.pitch
+        _pitch_old = self.pitch_old
 
-            yaw_angle /= l
-            pitch_angle /= l
-            roll_angle /= l
-            yaw_angle_deg = yaw_angle * r;
-            pitch_angle_deg = pitch_angle * r
-            roll_angle_deg = roll_angle * r
+        _heading = self.heading
+        _heading_old = self.heading_old
 
-            if len(Controller.initial_angles) < Controller.initial_angles_threshold:
-                Controller.initial_angles.append([pitch_angle_deg, roll_angle_deg, yaw_angle_deg])
-            else:
-                Controller.init_pitch = 0
-                Controller.init_roll = 0
-                Controller.init_yaw = 0
+        _roll = self.roll
+        _roll_old = self.roll_old
 
-                for ia in Controller.initial_angles:
-                    Controller.init_pitch += ia[0]
-                    Controller.init_roll += ia[1]
-                    Controller.init_yaw += ia[2]
+        # print self.roll
 
-                Controller.init_pitch /= Controller.initial_angles_threshold    
-                Controller.init_roll /= Controller.initial_angles_threshold
-                Controller.init_yaw /= Controller.initial_angles_threshold
+        # print abs(_roll - _roll_old)
 
-                self.head.xangle = 0
-                self.head.yangle = 0
-                # self.head.xangle = pitch_angle_deg - init_pitch
-                # self.head.yangle = roll_angle_deg - init_roll
-                if yaw_angle_deg - Controller.init_yaw < 100:
-                    self.head.zangle = yaw_angle_deg - Controller.init_yaw
+        # Only update roll angle if the difference is more than 0.1
+        # if abs(_roll - _roll_old) < 0.15:
+        #     self.roll_old = self.roll
 
+        # If changes in heading are small but changes in pitch are significant
+        # only update the pitch.
+        if  abs(_pitch - _pitch_old) > delta and abs(_heading - _heading_old) < delta:
+            self.heading = _heading_old
+            self.pitch_old = _pitch
+
+        # If changes in pitch are small but changes in heading are significant
+        # only update the heading.
+        if abs(_pitch - _pitch_old) < delta and abs(_heading - _heading_old) > delta:
+            self.heading_old = _heading;
+            self.pitch = _pitch_old;
+        
+        # If changes in pitch and heading are less than delta, then ignore the 
+        # changes for both.
+        if abs(_pitch - _pitch_old) < delta and abs(_heading - _heading_old) < delta:
+            self.heading = _heading_old;
+            self.pitch = _pitch_old;
+
+        self.head.xangle = 0;
+        self.head.yangle = (-1)*math.radians(self.heading) - math.radians(45) # on xy plane for gl;
+        self.head.zangle = math.radians(self.pitch) # on zx plane for gl;
+ 
     def update_head(self):
         while True:
-            data = copy(Controller.imu_measurements)
-            self.process_data(data["acc"], data["gyr"], data["mag"], None);
-            Controller.imu_measurements = {"acc" : [], "gyr" : [], "time" : [], "mag" : []}    
+            if len(Controller.imu_measurements["acc"]) >= 6:
+                data = copy(Controller.imu_measurements)
+                self.process_data(data["acc"], data["gyr"], data["mag"], None);
+                Controller.imu_measurements["acc"] = Controller.imu_measurements["acc"][1:]
+                Controller.imu_measurements["gyr"] = Controller.imu_measurements["gyr"][1:]
+                Controller.imu_measurements["mag"] = Controller.imu_measurements["mag"][1:]
+                Controller.imu_measurements["time"] = Controller.imu_measurements["time"][1:]
 
 if __name__ == "__main__":
     h = Head()
     c = Controller(h)
 
     while True:
-        # time.sleep(1)
+        time.sleep(1);
         print(h)
->>>>>>> 762f257cd8a536ffdf0fc0349cc297901105dbbe

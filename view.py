@@ -130,9 +130,9 @@ class View:
                 self.head.z + 1,
 
                 # what we're looking at
-                cos(radians(self.head.xangle)) * distance,
-                cos(radians(self.head.yangle)) * distance,
-                -1*cos(radians(self.head.zangle)) * distance,
+                #cos(radians(self.head.xangle)) * distance,
+                #cos(radians(self.head.yangle)) * distance,
+                #-1*cos(radians(self.head.zangle)) * distance,
 
                 #math.sin(self.head.xangle) * math.cos(self.head.zangle * -1) * (distance ** 2),
                 #math.cos(self.head.zangle) * math.sin(self.head.zangle * 1) * (distance ** 2),
@@ -142,9 +142,9 @@ class View:
                 #-1*math.sin(self.head.yangle)*math.cos(self.head.xangle)*distance,
                 #-1*math.cos(self.head.yangle)*math.cos(self.head.xangle)*distance - 1,
 
-                #math.cos(self.head.zangle)*math.cos(self.head.yangle),
-                #math.sin(self.head.zangle)*math.cos(self.head.yangle),
-                #math.sin(self.head.yangle) - 1,
+                math.cos(self.head.zangle)*math.cos(self.head.yangle),
+                math.sin(self.head.zangle)*math.cos(self.head.yangle),
+                math.sin(self.head.yangle),
 
                 # the up vector in the final view.
                 0, 1, 0
