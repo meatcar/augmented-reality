@@ -22,17 +22,18 @@ while True:
     img = Image(image.transpose([1,0,2]))
  
     depth = ds.getDepthMap()
+    deepDepth = depth.transpose() # later proccessing
     np.clip(depth, 0, 2**10 - 1, depth)
     depth >>=2
     depth = depth.astype(np.uint8).transpose()
     depth = Image(depth)
     depth = depth.invert()
  
-    #vertex = ds.getVertices()
-    #vertex = vertex.transpose([1,0,2])
+    vertex = ds.getVertices()
+    vertex = vertex.transpose([1,0,2])
 
     #dblobs = depth.findBlobs(minsize=2000, maxsize=14000)
-    dblobs = depth.findBlobs(minsize=2000, maxsize=(320*240/2))
+    dblobs = depth.findBlobs(minsize=2000, maxsize=((320*240) - (320*240/4)))
  
     box_center = None
     box = None
@@ -51,7 +52,7 @@ while True:
         # filter out region of depth above given colour distance (focuses our interest)
         if ((depth[b.centroid()] < (200,200,200)) \
                 and (depth[b.centroid()] > (40,40, 40)) \
-                and b.rectangleDistance() > 0.19):
+                and b.rectangleDistance() > 0.15):
             #print depth[b.centroid()], b.area(), b.rectangleDistance()
 
             old_point = box_point
@@ -98,32 +99,15 @@ while True:
         for bigb in possible_hands:
             
             bigbb = bigb.boundingBox()
-            x = bigbb[0]/2 + 20
-            y = bigbb[1]/2 + 20
-            
-            if x < 0:
-                x = 0
-            elif x > 320:
-                x = 320 - 20
-            if y < 0:
-                y = 0
-            elif y > 240:
-                y = 240 - 20
-            
-            cropped = img.crop(x, y, bigbb[2]*2, bigbb[3]*2)
-            hands = cropped.findSkintoneBlobs(minsize=1000)
-            if not hands:
-                continue
+            cropped = depth.crop(bigbb[0], bigbb[1], bigbb[2], bigbb[3])
+            corners = cropped.findCorners()
 
-            for hand in hands:
-                print hand.rectangleDistance(), hand.area()
-                if hand.rectangleDistance() < 0.1:
-                    continue
-                hand = [(px/2 + bigbb[0]/2, py/2 + bigbb[1]/2) for (px, py) in hand.contour()]
-                col_point = [(tpx, tpy) for (tpx, tpy) in hand if tpy == min([y for (x,y) in hand])][0]
-                depth.dl().polygon(hand, filled=True, color=Color.LEGO_BLUE)
-                depth.dl().circle(col_point, 20, Color.RED)
-                #depth.dl().polygon(bigb.contour(), color=Color.HOTPINK)
+            if not corners:
+                continue 
+
+            for corner in corners:
+                point = (corner.x + bigbb[0], corner.y + bigbb[1])
+                depth.dl().circle(point, 8, color=Color.GREEN)
 
     # append new point to the point array
     if (len(points) > 0) and (box_center):
