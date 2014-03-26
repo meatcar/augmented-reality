@@ -9,7 +9,7 @@ from time import sleep
 
 ds.initDepthSense()
 #disp = Display(flags = pg.FULLSCREEN)
-disp = Display()
+##disp = Display()
 points = []
 squares = []
 
@@ -47,7 +47,7 @@ while True:
         if len(points) > 2:
             depth.dl().lines(points, Color.BLUE, width=2)
         #depth.show()
-        depth.save(disp)
+        ##depth.save(disp)
         continue
     for b in dblobs:
         # filter out region of depth above given colour distance (focuses our interest)
@@ -77,14 +77,7 @@ while True:
             depth.dl().polygon(hand, filled=True, color=Color.YELLOW)
             depth.drawRectangle(bb[0], bb[1], bb[2], bb[3], color=Color.GREEN)
 
-            # points that opengl can use
-            print "{},{},{}".format(
-                    vertex[(box_point[0], box_point[1])][0],
-                    vertex[(box_point[0], box_point[1])][1],
-                    vertex[(box_point[0], box_point[1])][2]
-                    )
-            sys.stdout.flush()
-
+            
             # if two hands are found in the scene, record point information
             #counter+=1
             #if counter == 2:
@@ -121,6 +114,15 @@ while True:
         y_delta = abs(box_point[1] - points[-1][1])
         if (x_delta < 100 and y_delta < 100):
             points.append(box_point)
+
+            # points that opengl can use
+            print "{},{},{}".format(
+                    vertex[(box_point[0], box_point[1])][0],
+                    vertex[(box_point[0], box_point[1])][1],
+                    vertex[(box_point[0], box_point[1])][2]
+                    )
+            sys.stdout.flush()
+
         else:
             # point found faraway from previous point, restart array
             points = []
@@ -132,12 +134,12 @@ while True:
 
 
     # draw lines
-    if len(points) > 2:
-        depth.dl().lines(points, Color.BLUE, width=2)
+    #if len(points) > 2:
+    #    depth.dl().lines(points, Color.BLUE, width=2)
 
     # draw box
     #if len(squares) == 2:
     #    depth.dl().rectangle2pts(squares[0], squares[1], Color.RED, width=3, filled=False,)
 
     # draw scene
-    depth.save(disp)
+    ##depth.save(disp)
