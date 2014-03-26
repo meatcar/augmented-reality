@@ -28,10 +28,8 @@ class Controller(object):
     # stores roll pitch yaw initial values.
     first = [-1000, -1000, -1000]
     imu_measurements = {"acc" : [], "gyr" : [], "mag" : [], "time" : []}
-    
-    def __init__(self, head):
-        ds.initDepthSense()
 
+    def __init__(self, head):
         self.phidget = PhidgetWrapper(self.on_data)
         self.head = head
 
@@ -50,7 +48,7 @@ class Controller(object):
 
         # n x 3 matrix.
         acc = np.matrix(acc)
-        
+
         # n x 3 matrix.
         gyr = np.matrix(gyr)
 
@@ -59,28 +57,28 @@ class Controller(object):
         acc_x = np.mean(acc[0:,1])
         acc_y = np.mean(acc[0:,2])
 
-        # mean gyro reading in the x axis. 
+        # mean gyro reading in the x axis.
         # this is used to compute the heading (YAW).
-        # 
+        #
         # ignore the first value in gyro data, and take the mean to apply
-        # simple filtering. 
-        # TODO: try better smoothing techniques 
-        # - exponential smoothing, 
+        # simple filtering.
+        # TODO: try better smoothing techniques
+        # - exponential smoothing,
         # - moving average
-        # 
+        #
         # TODO: need to compensate for drift.
-        gyr_z = np.mean(gyr[1:,0]) 
+        gyr_z = np.mean(gyr[1:,0])
 
         # gravity measured by acceleration due to gravity.
         gravity = [acc_x, acc_y, acc_z]
-        
+
         # 12 samples accumulate about every 0.05 seconds.
         # compute to total change in YAW by integrating points over time.
-        # 
+        #
         # TOOD: The current implementation uses a simple filtering of the
         # gyro data. A threshold of 0.8 is chosen. Only is the angular
         # rate of change is greater than the threshold, will there be
-        # a change in the total angle. 
+        # a change in the total angle.
         if abs(gyr_z) > 0.8:
             self.heading = self.heading + gyr_z*0.025;
 
@@ -91,13 +89,13 @@ class Controller(object):
         # Scaling factor for producing reasonable degree numbers.
         r = 30*math.pi/180.0 * 100
 
-        # record the first value as a threshold. 
+        # record the first value as a threshold.
         # All the values after will be adjusted based on this.
         if self.first[0] == -1000:
             self.first = [0, 0, 0]
             self.first[0] = roll_angle;
             self.first[1] = round(pitch_angle*r,1);
-            self.first[2] = 0   
+            self.first[2] = 0
 
         # compute the current pitch
         self.pitch = round(pitch_angle*r,1)  - self.first[1];
@@ -105,8 +103,8 @@ class Controller(object):
 
         # self.roll = self.roll * 0.025
 
-        # The following code compensates for simultaneous movements in 
-        # pitch and YAW which would lead to incorrect measurement of 
+        # The following code compensates for simultaneous movements in
+        # pitch and YAW which would lead to incorrect measurement of
         # angles in both movements.
 
         _pitch     = self.pitch
@@ -137,8 +135,8 @@ class Controller(object):
         if abs(_pitch - _pitch_old) < delta and abs(_heading - _heading_old) > delta:
             self.heading_old = _heading;
             self.pitch = _pitch_old;
-        
-        # If changes in pitch and heading are less than delta, then ignore the 
+
+        # If changes in pitch and heading are less than delta, then ignore the
         # changes for both.
         if abs(_pitch - _pitch_old) < delta and abs(_heading - _heading_old) < delta:
             self.heading = _heading_old;
@@ -147,7 +145,7 @@ class Controller(object):
         self.head.xangle = 0;
         self.head.yangle = (-1)*math.radians(self.heading) - math.radians(45) # on xy plane for gl;
         self.head.zangle = math.radians(self.pitch) # on zx plane for gl;
- 
+
     def update_head(self):
         while True:
             if len(Controller.imu_measurements["acc"]) >= 6:

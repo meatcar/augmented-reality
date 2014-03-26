@@ -13,14 +13,15 @@ disp = Display()
 points = []
 squares = []
 
-# Main loop closes only on keyboard kill signal 
-while True: 
- 
+
+# Main loop closes only on keyboard kill signal
+while True:
+
     # Get depth and colour images from the kinect
-    image = ds.getColourMap()
-    image = image[:,:,::-1]
-    img = Image(image.transpose([1,0,2]))
- 
+    #image = ds.getColourMap()
+    #image = image[:,:,::-1]
+    #img = Image(image.transpose([1,0,2]))
+
     depth = ds.getDepthMap()
     deepDepth = depth.transpose() # later proccessing
     np.clip(depth, 0, 2**10 - 1, depth)
@@ -28,13 +29,13 @@ while True:
     depth = depth.astype(np.uint8).transpose()
     depth = Image(depth)
     depth = depth.invert()
- 
+
     vertex = ds.getVertices()
     vertex = vertex.transpose([1,0,2])
 
     #dblobs = depth.findBlobs(minsize=2000, maxsize=14000)
     dblobs = depth.findBlobs(minsize=2000, maxsize=((320*240) - (320*240/4)))
- 
+
     box_center = None
     box = None
     box_point = None
@@ -77,8 +78,13 @@ while True:
             depth.drawRectangle(bb[0], bb[1], bb[2], bb[3], color=Color.GREEN)
 
             # points that opengl can use
-            #print vertex[(box_point[0], box_point[1])]
- 
+            print "{},{},{}".format(
+                    vertex[(box_point[0], box_point[1])][0],
+                    vertex[(box_point[0], box_point[1])][1],
+                    vertex[(box_point[0], box_point[1])][2]
+                    )
+            sys.stdout.flush()
+
             # if two hands are found in the scene, record point information
             #counter+=1
             #if counter == 2:
@@ -89,25 +95,25 @@ while True:
             #        squares.append(top)
             #        squares.append(bottom)
             #        continue
- 
- 
+
+
     # search within the colour image if no hand found
     if box_center == None:
         possible_hands.append(dblobs[-1])
         bb = dblobs[-1].boundingBox()
         depth.drawRectangle(bb[0], bb[1], bb[2], bb[3], color=Color.YELLOW)
-        for bigb in possible_hands:
-            
-            bigbb = bigb.boundingBox()
-            cropped = depth.crop(bigbb[0], bigbb[1], bigbb[2], bigbb[3])
-            corners = cropped.findCorners()
+        #for bigb in possible_hands:
 
-            if not corners:
-                continue 
+            #bigbb = bigb.boundingBox()
+            #cropped = depth.crop(bigbb[0], bigbb[1], bigbb[2], bigbb[3])
+            #corners = cropped.findCorners()
 
-            for corner in corners:
-                point = (corner.x + bigbb[0], corner.y + bigbb[1])
-                depth.dl().circle(point, 8, color=Color.GREEN)
+            #if not corners:
+                #continue
+
+            #for corner in corners:
+                #point = (corner.x + bigbb[0], corner.y + bigbb[1])
+                #depth.dl().circle(point, 8, color=Color.GREEN)
 
     # append new point to the point array
     if (len(points) > 0) and (box_center):
@@ -119,19 +125,19 @@ while True:
             # point found faraway from previous point, restart array
             points = []
             points.append(box_point)
-    
+
     # first point in the scene
     elif (box_center):
         points.append(box_point)
- 
- 
+
+
     # draw lines
     if len(points) > 2:
         depth.dl().lines(points, Color.BLUE, width=2)
- 
+
     # draw box
     #if len(squares) == 2:
     #    depth.dl().rectangle2pts(squares[0], squares[1], Color.RED, width=3, filled=False,)
- 
+
     # draw scene
     depth.save(disp)

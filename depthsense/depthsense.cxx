@@ -48,7 +48,7 @@
 using namespace DepthSense;
 using namespace std;
 
-// depth sense node inits 
+// depth sense node inits
 static Context g_context;
 static DepthNode g_dnode;
 static ColorNode g_cnode;
@@ -56,13 +56,13 @@ static AudioNode g_anode;
 
 static bool g_bDeviceFound = false;
 
-// unecassary frame counters 
+// unecassary frame counters
 static uint32_t g_aFrames = 0;
 static uint32_t g_cFrames = 0;
 static uint32_t g_dFrames = 0;
 
 
-// map dimensions 
+// map dimensions
 static int32_t dW = 320;
 static int32_t dH = 240;
 static int32_t cW = 640;
@@ -88,7 +88,7 @@ static uint8_t *colourFullMap;
 static float *accelMap;
 static float *accelFullMap;
 
-// internal map copies 
+// internal map copies
 static uint8_t colourMapClone[640*480*3];
 static uint16_t depthMapClone[320*240];
 static int16_t vertexMapClone[320*240*3];
@@ -145,7 +145,7 @@ static void onNewColorSample(ColorNode node, ColorNode::NewSampleReceivedData da
 // New depth sample event handler
 static void onNewDepthSample(DepthNode node, DepthNode::NewSampleReceivedData data)
 {
-    // Depth 
+    // Depth
     memcpy(depthMap, data.depthMap, dshmsz);
     dptrSwap(&depthMap, &depthFullMap);
 
@@ -157,15 +157,15 @@ static void onNewDepthSample(DepthNode node, DepthNode::NewSampleReceivedData da
             vertexMap[i*dW*3 + j*3 + 1] = vertex.y;
             vertexMap[i*dW*3 + j*3 + 2] = vertex.z;
             //cout << vertex.x << vertex.y << vertex.z << endl;
-            
+
         }
     }
     vptrSwap(&vertexMap, &vertexFullMap);
 
     // Acceleration
-    accelMap[0] = data.acceleration.x; 
-    accelMap[1] = data.acceleration.y; 
-    accelMap[2] = data.acceleration.z; 
+    accelMap[0] = data.acceleration.x;
+    accelMap[1] = data.acceleration.y;
+    accelMap[2] = data.acceleration.z;
     aptrSwap(&accelMap, &accelFullMap);
 
     g_dFrames++;
@@ -179,12 +179,12 @@ static void configureAudioNode()
     AudioNode::Configuration config = g_anode.getConfiguration();
     config.sampleRate = 44100;
 
-    try 
+    try
     {
         g_context.requestControl(g_anode,0);
 
         g_anode.setConfiguration(config);
-        
+
         g_anode.setInputMixerLevel(0.5f);
     }
     catch (ArgumentException& e)
@@ -220,7 +220,7 @@ static void configureDepthNode()
     config.mode = DepthNode::CAMERA_MODE_CLOSE_MODE;
     config.saturation = true;
 
-    try 
+    try
     {
         g_context.requestControl(g_dnode,0);
         g_dnode.setConfidenceThreshold(100);
@@ -266,9 +266,6 @@ static void configureDepthNode()
 /*----------------------------------------------------------------------------*/
 static void configureColorNode()
 {
-    // connect new color sample handler
-    g_cnode.newSampleReceivedEvent().connect(&onNewColorSample);
-
     ColorNode::Configuration config = g_cnode.getConfiguration();
     config.frameFormat = FRAME_FORMAT_VGA;
     config.compression = COMPRESSION_TYPE_MJPEG;
@@ -276,9 +273,12 @@ static void configureColorNode()
     config.framerate = 30;
 
 
-    try 
+    try
     {
         g_context.requestControl(g_cnode,0);
+
+        g_cnode.setConfiguration(config);
+
         g_cnode.setBrightness(0);
         g_cnode.setContrast(5);
         g_cnode.setSaturation(5);
@@ -289,7 +289,7 @@ static void configureColorNode()
         g_cnode.setWhiteBalanceAuto(true);
 
         g_cnode.setEnableColorMap(true);
-        g_cnode.setConfiguration(config);
+
     }
     catch (ArgumentException& e)
     {
@@ -319,7 +319,10 @@ static void configureColorNode()
     {
         printf("TimeoutException\n");
     }
-    
+
+    // connect new color sample handler
+    g_cnode.newSampleReceivedEvent().connect(&onNewColorSample);
+
 }
 
 /*----------------------------------------------------------------------------*/
@@ -336,7 +339,7 @@ static void configureNode(Node node)
     {
         g_cnode = node.as<ColorNode>();
         configureColorNode();
-        g_context.registerNode(node);
+        //g_context.registerNode(node);
     }
 
     if ((node.is<AudioNode>())&&(!g_anode.isSet()))
@@ -405,46 +408,46 @@ static void initds()
 {
     // shared mem double buffers
     if ((depthMap = (uint16_t *) mmap(NULL, dshmsz, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;"); 
-        exit(1); 
+        perror("mmap: cannot alloc shmem;");
+        exit(1);
     }
 
     if ((depthFullMap = (uint16_t *) mmap(NULL, dshmsz, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;"); 
-        exit(1); 
+        perror("mmap: cannot alloc shmem;");
+        exit(1);
     }
 
     // shared mem double buffers
     if ((accelMap = (float *) mmap(NULL, 3*sizeof(float), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;"); 
-        exit(1); 
+        perror("mmap: cannot alloc shmem;");
+        exit(1);
     }
 
     if ((accelFullMap = (float *) mmap(NULL, 3*sizeof(float), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;"); 
-        exit(1); 
+        perror("mmap: cannot alloc shmem;");
+        exit(1);
     }
 
     // shared mem double buffers
     if ((colourMap = (uint8_t *) mmap(NULL, cshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;"); 
-        exit(1); 
+        perror("mmap: cannot alloc shmem;");
+        exit(1);
     }
 
     if ((colourFullMap = (uint8_t *) mmap(NULL, cshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;"); 
-        exit(1); 
+        perror("mmap: cannot alloc shmem;");
+        exit(1);
     }
-    
+
     // shared mem double buffers
     if ((vertexMap = (int16_t *) mmap(NULL, vshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;"); 
-        exit(1); 
+        perror("mmap: cannot alloc shmem;");
+        exit(1);
     }
 
     if ((vertexFullMap = (int16_t *) mmap(NULL, vshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;"); 
-        exit(1); 
+        perror("mmap: cannot alloc shmem;");
+        exit(1);
     }
 
     child_pid = fork();
@@ -466,9 +469,9 @@ static void initds()
             da[0].nodeRemovedEvent().connect(&onNodeDisconnected);
 
             vector<Node> na = da[0].getNodes();
-            
+
             //printf("Found %u nodes\n",na.size());
-            
+
             for (int n = 0; n < (int)na.size();n++)
                 configureNode(na[n]);
         }
@@ -487,7 +490,7 @@ static void initds()
 }
 /*----------------------------------------------------------------------------*/
 
-static PyObject *getColour(PyObject *self, PyObject *args) 
+static PyObject *getColour(PyObject *self, PyObject *args)
 {
     npy_intp dims[3] = {cH, cW, 3};
 
@@ -495,7 +498,7 @@ static PyObject *getColour(PyObject *self, PyObject *args)
     return PyArray_SimpleNewFromData(3, dims, NPY_UINT8, colourMapClone);
 }
 
-static PyObject *getDepth(PyObject *self, PyObject *args) 
+static PyObject *getDepth(PyObject *self, PyObject *args)
 {
     npy_intp dims[2] = {dH, dW};
 
@@ -503,7 +506,7 @@ static PyObject *getDepth(PyObject *self, PyObject *args)
     return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, depthMapClone);
 }
 
-static PyObject *getAccel(PyObject *self, PyObject *args) 
+static PyObject *getAccel(PyObject *self, PyObject *args)
 {
     npy_intp dims[1] = {3};
 
@@ -511,7 +514,7 @@ static PyObject *getAccel(PyObject *self, PyObject *args)
     return PyArray_SimpleNewFromData(1, dims, NPY_FLOAT32, accelMapClone);
 }
 
-static PyObject *getVertex(PyObject *self, PyObject *args) 
+static PyObject *getVertex(PyObject *self, PyObject *args)
 {
     npy_intp dims[3] = {dH, dW, 3};
     memcpy(vertexMapClone, vertexFullMap, vshmsz*3);
@@ -550,7 +553,7 @@ PyMODINIT_FUNC initDepthSense(void)
 
 int main(int argc, char* argv[])
 {
-    
+
     /* Pass argv[0] to the Python interpreter */
     Py_SetProgramName((char *)"DepthSense");
 
@@ -561,6 +564,6 @@ int main(int argc, char* argv[])
     initDepthSense();
 
     //initds(); //for testing
-    
+
     return 0;
 }

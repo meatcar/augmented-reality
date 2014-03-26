@@ -2,13 +2,15 @@ from head import Head
 from shape import Shape
 from view import View
 from dots import Dots
+from handtracker import HandTracker
 from controller import Controller
-#from key_controller import KeyController
+from key_controller import KeyController
 
 if __name__ == "__main__":
     head = Head()
     shape = Shape(height=0.4, width=0.4, x=0, y=0, z=-9)
     dots = Dots()
+
 
     # Cube
     dots.add(-140, -36, 413)
@@ -40,8 +42,9 @@ if __name__ == "__main__":
 
     view = View(head=head, shape=shape, dots=dots)
 
-    controller = Controller(head)
-    #keycontroller = KeyController(head, shape)
+    handtracker = HandTracker(dots)
+    #controller = Controller(head)
+    keycontroller = KeyController(head, shape)
 
     view.run()
 
