@@ -144,7 +144,7 @@ class Controller(object):
 
         self.head.xangle = 0;
         self.head.yangle = (-1)*math.radians(self.heading) - math.radians(45) # on xy plane for gl;
-        self.head.zangle = math.radians(self.pitch) # on zx plane for gl;
+        self.head.zangle = (1)*math.radians(self.pitch) # on zx plane for gl;
 
     def update_head(self):
         while True:

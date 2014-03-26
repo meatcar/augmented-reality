@@ -117,8 +117,8 @@ while True:
 
             # points that opengl can use
             print "{},{},{}".format(
-                    vertex[(box_point[0], box_point[1])][0],
-                    vertex[(box_point[0], box_point[1])][1],
+                    vertex[(box_point[0], box_point[1])][0] *-2,
+                    vertex[(box_point[0], box_point[1])][1] *-2,
                     vertex[(box_point[0], box_point[1])][2]
                     )
             sys.stdout.flush()

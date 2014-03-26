@@ -14,8 +14,7 @@ class HandTracker(object):
         self.dots = dots
 
         self.proc = subprocess.Popen(
-                ["python2 handtracking/dsHandTracker.py"],
-                shell=True,
+                ["python2", "handtracking/dsHandTracker.py"],
                 stdout=subprocess.PIPE
         )
 
