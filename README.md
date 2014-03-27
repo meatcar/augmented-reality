@@ -13,7 +13,7 @@ Our codebase is written in Python3, Python2 and C++. The image processing and ha
 
 ## Installation
 
-These instructions are for Linux (sorry).
+These instructions are for Linux (sorry) (not really).
 
 #### DepthSense
 
