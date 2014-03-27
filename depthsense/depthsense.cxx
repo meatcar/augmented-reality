@@ -266,19 +266,23 @@ static void configureDepthNode()
 /*----------------------------------------------------------------------------*/
 static void configureColorNode()
 {
+
+    // connect new color sample handler
+    g_cnode.newSampleReceivedEvent().connect(&onNewColorSample);
+
     ColorNode::Configuration config = g_cnode.getConfiguration();
     config.frameFormat = FRAME_FORMAT_VGA;
     config.compression = COMPRESSION_TYPE_MJPEG;
     config.powerLineFrequency = POWER_LINE_FREQUENCY_50HZ;
     config.framerate = 30;
 
+    g_cnode.setEnableColorMap(true);
 
     try
     {
         g_context.requestControl(g_cnode,0);
 
         g_cnode.setConfiguration(config);
-
         g_cnode.setBrightness(0);
         g_cnode.setContrast(5);
         g_cnode.setSaturation(5);
@@ -288,7 +292,6 @@ static void configureColorNode()
         g_cnode.setSharpness(5);
         g_cnode.setWhiteBalanceAuto(true);
 
-        g_cnode.setEnableColorMap(true);
 
     }
     catch (ArgumentException& e)
@@ -320,9 +323,6 @@ static void configureColorNode()
         printf("TimeoutException\n");
     }
 
-    // connect new color sample handler
-    g_cnode.newSampleReceivedEvent().connect(&onNewColorSample);
-
 }
 
 /*----------------------------------------------------------------------------*/
@@ -339,14 +339,15 @@ static void configureNode(Node node)
     {
         g_cnode = node.as<ColorNode>();
         configureColorNode();
-        //g_context.registerNode(node);
+        g_context.registerNode(node);
     }
 
     if ((node.is<AudioNode>())&&(!g_anode.isSet()))
     {
         g_anode = node.as<AudioNode>();
         configureAudioNode();
-        g_context.registerNode(node);
+        // Audio seems to take up bandwith on usb3.0 devices ... we'll make this a param
+        //g_context.registerNode(node);
     }
 }
 
