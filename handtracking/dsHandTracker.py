@@ -9,7 +9,7 @@ from time import sleep
 
 ds.initDepthSense()
 #disp = Display(flags = pg.FULLSCREEN)
-##disp = Display()
+disp = Display()
 points = []
 squares = []
 
@@ -47,7 +47,7 @@ while True:
         if len(points) > 2:
             depth.dl().lines(points, Color.BLUE, width=2)
         #depth.show()
-        ##depth.save(disp)
+        depth.save(disp)
         continue
     for b in dblobs:
         # filter out region of depth above given colour distance (focuses our interest)
@@ -119,7 +119,7 @@ while True:
             print "{},{},{}".format(
                     vertex[(box_point[0], box_point[1])][0] *-2,
                     vertex[(box_point[0], box_point[1])][1] *-2,
-                    vertex[(box_point[0], box_point[1])][2]
+                    vertex[(box_point[0], box_point[1])][2] * 2
                     )
             sys.stdout.flush()
 
@@ -134,12 +134,12 @@ while True:
 
 
     # draw lines
-    #if len(points) > 2:
-    #    depth.dl().lines(points, Color.BLUE, width=2)
+    if len(points) > 2:
+        depth.dl().lines(points, Color.BLUE, width=2)
 
     # draw box
     #if len(squares) == 2:
     #    depth.dl().rectangle2pts(squares[0], squares[1], Color.RED, width=3, filled=False,)
 
     # draw scene
-    ##depth.save(disp)
+    depth.save(disp)
