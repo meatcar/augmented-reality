@@ -217,7 +217,7 @@ class View:
             # head --- \
             #           \ --- \
             #                  \ --- obj
-            # (that was suppose to be a diagonal line)
+            # (that was suppose to be a diagonal line, but think of it as any line)
             # we know that direction based off of imu angles
             # 
             # normalize this direction vector * distance = new origin
@@ -266,14 +266,15 @@ class View:
         glEnd()
 
     def draw_circles(self, radius):
-        # ignore this func
+        # ignore this func, i wanted to represent hands as circles but .. yea
         point1, point2 = self.dots.getLastTwo()
         if point1 and point2 and point1 != 64002 and point2 != 64002: # magic numbers (2 * depthsense number code for bad data)
             x,y = point2[0]/100,point2[1]/100
             glColor3f(1,0,0)
+            # Todo translate 2D circle to the z = -1 plane (i believe its drawn behind the camera now)
             glBegin(GL_LINE_LOOP);
             for i in range(0,360):
-                glVertex3f(x + cos(radians(i)*radius/100), y + sin(radians(i)*radius/100, -1))
+                glVertex2f(x + cos(radians(i)*radius/100), y + sin(radians(i)*radius/100))
             glEnd()
 
 
