@@ -3,8 +3,8 @@ from OpenGL.GLUT import *
 from OpenGL.GLU import *
 from PIL import Image
 import numpy
-from math import sin,cos,tan,radians
 import math
+from math import sin,cos,tan,radians
 import sys
 
 import head
@@ -22,6 +22,8 @@ class View:
         self.fps = 60
         self.width = 0
         self.height = 0
+        
+        self.points = []
 
         glutInitDisplayMode(GLUT_RGBA)
         glutInitWindowSize(256,224)
@@ -129,22 +131,15 @@ class View:
                 self.head.y,
                 self.head.z + 1,
 
-                # what we're looking at
-                #cos(radians(self.head.xangle)) * distance,
-                #cos(radians(self.head.yangle)) * distance,
-                #-1*cos(radians(self.head.zangle)) * distance,
+                # Key controller mode
+                cos(radians(self.head.xangle)) * distance,
+                cos(radians(self.head.yangle)) * distance,
+                -1*cos(radians(self.head.zangle)) * distance,
 
-                #math.sin(self.head.xangle) * math.cos(self.head.zangle * -1) * (distance ** 2),
-                #math.cos(self.head.zangle) * math.sin(self.head.zangle * 1) * (distance ** 2),
-                #math.sin(self.head.xangle) * distance - 1,
-
-                #math.sin(self.head.xangle)*distance,
-                #-1*math.sin(self.head.yangle)*math.cos(self.head.xangle)*distance,
-                #-1*math.cos(self.head.yangle)*math.cos(self.head.xangle)*distance - 1,
-
-                math.cos(self.head.zangle)*math.cos(self.head.yangle),
-                math.sin(self.head.zangle)*math.cos(self.head.yangle),
-                math.sin(self.head.yangle),
+                # IMU mode 
+                #math.cos(self.head.zangle)*math.cos(self.head.yangle),
+                #math.sin(self.head.zangle)*math.cos(self.head.yangle),
+                #math.sin(self.head.yangle),
 
                 # the up vector in the final view.
                 0, 1, 0
@@ -203,6 +198,7 @@ class View:
 
     def draw_lines(self):
         glLineWidth(3);
+<<<<<<< HEAD
         #glColor3f(1, 0, 0);
         point1 = self.dots.dots[0]
         for i in range(1, len(self.dots.dots), 3):
@@ -214,8 +210,100 @@ class View:
             glVertex3f(self.head.x + point2[0]/100,
                        self.head.y + point2[1]/100,
                        point2[2]/100*-1)
+=======
+        
+        point1, point2 = self.dots.getLastTwo()
+        #print(point1, point2)
+        
+        # decide if two new points are useful
+        if point1 and point2 and not \
+            ((point1[0] > 62000 or point1[1] > 62000 or point1[2] > 62000) or \
+            (point2[0] > 62000 or point2[1] > 62000 or point2[2] > 62000)):
+            # magic numbers (2 * depthsense number code for bad data)
+           
+
+            
+            # starting direction = (0,0,1) * distance = (0,0, distance) = starting origin
+            # starting angles produce vector (0,0,1) in both imu and keyboard
+            # goal: find new origin 
+
+            # | ------ distance ------ |
+            #
+            # head --- \
+            #           \ --- \
+            #                  \ --- obj
+            # (that was suppose to be a diagonal line, but think of it as any line)
+            # we know that direction based off of imu angles
+            # 
+            # normalize this direction vector * distance = new origin
+            # 
+
+            # measure distance to obj from camera/persons head/imu location w.e you wanna call it
+            distance = math.sqrt(
+                (self.head.x - point2[0]/100) ** 2 +
+                (self.head.y - point2[1]/100) ** 2 +
+                (self.head.z - point2[2]/100) ** 2
+            )
+
+            # using mouse/keyboard angles (i left distance in there but it should be removed)
+            sx, sy, sz = cos(radians(self.head.xangle)) * distance, \
+                    cos(radians(self.head.yangle)) * distance, \
+                    -1*cos(radians(self.head.zangle)) * distance
+            
+            # using imu angles
+            #sx, sy, sz = math.cos(self.head.zangle)*math.cos(self.head.yangle), \
+            #    math.sin(self.head.zangle)*math.cos(self.head.yangle), \
+            #    math.sin(self.head.yangle),
+                
+            # normalize the vecotr (will rescale with the distance we need to cover)
+            ns = math.sqrt(sx*sx + sy*sy + sz*sz)
+            #print(sx/ns, sy/ns, sz/ns, distance)
+
+            # store points with updated location (deals with the redrawing problem later)
+            self.points.append((self.head.x + point1[0]/100 - sx/ns*distance, self.head.y + point1[1]/100 - sy/ns*distance, point1[2]/100))
+            self.points.append((self.head.x + point2[0]/100 - sx/ns*distance, self.head.y + point2[1]/100 - sy/ns*distance, point2[2]/100))
+
+
+        # bail if no points
+        if len(self.points) < 2:
+            return
+
+        # redraw all points (TODO: find way of just appending points instead of redrawing everything)
+        point0 = self.points[0]
+        glBegin(GL_LINES)
+        for point in self.points[1:]:
+
+            # pick colour based on depth
+            red = (1 - ((point0[2] + point[2])%50)/50)/8 # doesnt matter what we do here
+            blue = 1 - (((point0[2] + point[2])%50)/50) # doesnt matter what we do here
+            green = (1 -  ((point0[2] + point[2])%50)/50)/8 # doesnt matter what we do here
+            glColor3f(red,green,blue)
+
+            glVertex3f(point0[0] ,
+                   point0[1],
+                   point0[2]*-1)
+            glVertex3f(point[0],
+                   point[1],
+                   point[2]*-1)
+
+            point0 = point
+
+        glEnd()
+
+    def draw_circles(self, radius):
+        # ignore this func, i wanted to represent hands as circles but .. yea
+        point1, point2 = self.dots.getLastTwo()
+        if point1 and point2 and point1 != 64002 and point2 != 64002: # magic numbers (2 * depthsense number code for bad data)
+            x,y = point2[0]/100,point2[1]/100
+            glColor3f(1,0,0)
+            # Todo translate 2D circle to the z = -1 plane (i believe its drawn behind the camera now)
+            glBegin(GL_LINE_LOOP);
+            for i in range(0,360):
+                glVertex2f(x + cos(radians(i)*radius/100), y + sin(radians(i)*radius/100))
+>>>>>>> 7b6af8a7a2f14b94efeda90b1177b7f3810c9e3c
             glEnd()
-            point1 = point2
+
+
 
 if __name__ == "__main__":
     thing = View()

@@ -15,10 +15,9 @@ class HandTracker(object):
 
         self.proc = subprocess.Popen(
                 ["python2", "handtracking/dsHandTracker.py"],
-                stdout=subprocess.PIPE
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
         )
-
-        self.out = self.proc.stdout
 
         # exec handtracking/dsHandTracker.py
         # save pipe on self
@@ -28,9 +27,10 @@ class HandTracker(object):
 
     def track(self):
         while True:
-            for line in self.proc.stdout:
-                points = numpy.fromstring(line, dtype="int32", sep=",")
-                self.dots.add(points[0], points[1], points[2])
+            data = self.proc.stdout.readline()
+            points = numpy.fromstring(data, dtype="int32", sep=",")
+            self.dots.add(points[0], points[1], points[2])
+
 
 if __name__ == "__main__":
     ht = HandTracker(None);
