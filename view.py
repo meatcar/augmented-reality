@@ -200,7 +200,9 @@ class View:
         glLineWidth(3);
         
         point1, point2 = self.dots.getLastTwo()
-        print(point1, point2)
+        #print(point1, point2)
+        
+        # decide if two new points are useful
         if point1 and point2 and not \
             ((point1[0] > 62000 or point1[1] > 62000 or point1[2] > 62000) or \
             (point2[0] > 62000 or point2[1] > 62000 or point2[2] > 62000)):
@@ -223,27 +225,37 @@ class View:
             # normalize this direction vector * distance = new origin
             # 
 
+            # measure distance to obj from camera/persons head/imu location w.e you wanna call it
             distance = math.sqrt(
                 (self.head.x - point2[0]/100) ** 2 +
                 (self.head.y - point2[1]/100) ** 2 +
                 (self.head.z - point2[2]/100) ** 2
             )
 
-            # using mouse/keyboard angles
+            # using mouse/keyboard angles (i left distance in there but it should be removed)
             sx, sy, sz = cos(radians(self.head.xangle)) * distance, \
                     cos(radians(self.head.yangle)) * distance, \
                     -1*cos(radians(self.head.zangle)) * distance
             
+            # using imu angles
+            #sx, sy, sz = math.cos(self.head.zangle)*math.cos(self.head.yangle), \
+            #    math.sin(self.head.zangle)*math.cos(self.head.yangle), \
+            #    math.sin(self.head.yangle),
+                
+            # normalize the vecotr (will rescale with the distance we need to cover)
             ns = math.sqrt(sx*sx + sy*sy + sz*sz)
-            print(sx/ns, sy/ns, sz/ns, distance)
+            #print(sx/ns, sy/ns, sz/ns, distance)
 
+            # store points with updated location (deals with the redrawing problem later)
             self.points.append((self.head.x + point1[0]/100 - sx/ns*distance, self.head.y + point1[1]/100 - sy/ns*distance, point1[2]/100))
             self.points.append((self.head.x + point2[0]/100 - sx/ns*distance, self.head.y + point2[1]/100 - sy/ns*distance, point2[2]/100))
 
 
+        # bail if no points
         if len(self.points) < 2:
             return
 
+        # redraw all points (TODO: find way of just appending points instead of redrawing everything)
         point0 = self.points[0]
         glBegin(GL_LINES)
         for point in self.points[1:]:
