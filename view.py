@@ -26,7 +26,7 @@ class View:
         self.points = []
 
         glutInitDisplayMode(GLUT_RGBA)
-        glutInitWindowSize(256,224)
+        #glutInitWindowSize(256,224)
         self.window = glutCreateWindow(b"GL")
 
     def TexFromPNG(self, filename=b'', data=None):
