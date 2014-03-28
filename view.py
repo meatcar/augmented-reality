@@ -3,8 +3,8 @@ from OpenGL.GLUT import *
 from OpenGL.GLU import *
 from PIL import Image
 import numpy
-from math import sin,cos,tan,radians
 import math
+from math import sin,cos,tan,radians
 import sys
 
 import head
@@ -22,6 +22,8 @@ class View:
         self.fps = 60
         self.width = 0
         self.height = 0
+        
+        self.points = []
 
         glutInitDisplayMode(GLUT_RGBA)
         glutInitWindowSize(256,224)
@@ -129,22 +131,15 @@ class View:
                 self.head.y,
                 self.head.z + 1,
 
-                # what we're looking at
-                #cos(radians(self.head.xangle)) * distance,
-                #cos(radians(self.head.yangle)) * distance,
-                #-1*cos(radians(self.head.zangle)) * distance,
+                # Key controller mode
+                cos(radians(self.head.xangle)) * distance,
+                cos(radians(self.head.yangle)) * distance,
+                -1*cos(radians(self.head.zangle)) * distance,
 
-                #math.sin(self.head.xangle) * math.cos(self.head.zangle * -1) * (distance ** 2),
-                #math.cos(self.head.zangle) * math.sin(self.head.zangle * 1) * (distance ** 2),
-                #math.sin(self.head.xangle) * distance - 1,
-
-                #math.sin(self.head.xangle)*distance,
-                #-1*math.sin(self.head.yangle)*math.cos(self.head.xangle)*distance,
-                #-1*math.cos(self.head.yangle)*math.cos(self.head.xangle)*distance - 1,
-
-                math.cos(self.head.zangle)*math.cos(self.head.yangle),
-                math.sin(self.head.zangle)*math.cos(self.head.yangle),
-                math.sin(self.head.yangle),
+                # IMU mode 
+                #math.cos(self.head.zangle)*math.cos(self.head.yangle),
+                #math.sin(self.head.zangle)*math.cos(self.head.yangle),
+                #math.sin(self.head.yangle),
 
                 # the up vector in the final view.
                 0, 1, 0
@@ -205,22 +200,73 @@ class View:
         glLineWidth(3);
         
         point1, point2 = self.dots.getLastTwo()
-        if point1 and point2:
+        if point1 and point2 and point1 != 64002 and point2 != 64002: # magic numbers (2 * depthsense number code for bad data)
+           
 
-            # pick colour based on depth
-            red = ((point1[2] + point2[2]) * 300 % 255)/255 
-            blue = ((point1[2] + point2[2]) * 1010 % 255)/255 
-            green = ((point1[2] + point2[2]) * 666 % 255)/255 
-            glColor3f(red,green,blue)
+            
+            # starting direction = (0,0,1) * distance = (0,0, distance) = starting origin
+            # starting angles produce vector (0,0,1) in both imu and keyboard
+            # goal: find new origin 
 
-            # only draw last two points 
+            # | ------ distance ------ |
+            #
+            # head --- \
+            #           \ --- \
+            #                  \ --- obj
+            # (that was suppose to be a diagonal line)
+            # we know that direction based off of imu angles
+            # 
+            # normalize this direction vector * distance = new origin
+            # 
+
+            distance = math.sqrt(
+                (self.head.x - point2[0]/100) ** 2 +
+                (self.head.y - point2[1]/100) ** 2 +
+                (self.head.z - point2[2]/100) ** 2
+            )
+
+            # using mouse/keyboard angles
+            sx, sy, sz = cos(radians(self.head.xangle)) * distance, \
+                    cos(radians(self.head.yangle)) * distance, \
+                    -1*cos(radians(self.head.zangle)) * distance
+            
+            ns = math.sqrt(sx*sx + sy*sy + sz*sz)
+            #print(sx/ns, sy/ns, sz/ns, distance)
+
+            self.points.append((self.head.x + point1[0]/100 - sx/ns*distance, self.head.y + point1[1]/100 - sy/ns*distance, point1[2]/100))
+            self.points.append((self.head.x + point2[0]/100 - sx/ns*distance, self.head.y + point2[1]/100 - sy/ns*distance, point2[2]/100))
+
+
+            point0 = self.points[0]
             glBegin(GL_LINES)
-            glVertex3f(self.head.x + point1[0]/100,
-                   self.head.y + point1[1]/100,
-                   point1[2]/100*-1)
-            glVertex3f(self.head.x + point2[0]/100,
-                   self.head.y + point2[1]/100,
-                   point2[2]/100*-1)
+            for point in self.points[1:]:
+
+                # pick colour based on depth
+                red = (1 - ((point0[2] + point[2])%50)/50)/8 # doesnt matter what we do here
+                blue = 1 - (((point0[2] + point[2])%50)/50) # doesnt matter what we do here
+                green = (1 -  ((point0[2] + point[2])%50)/50)/8 # doesnt matter what we do here
+                glColor3f(red,green,blue)
+
+                glVertex3f(point0[0] ,
+                       point0[1],
+                       point0[2]*-1)
+                glVertex3f(point[0],
+                       point[1],
+                       point[2]*-1)
+
+                point0 = point
+
+            glEnd()
+
+    def draw_circles(self, radius):
+        # ignore this func
+        point1, point2 = self.dots.getLastTwo()
+        if point1 and point2 and point1 != 64002 and point2 != 64002: # magic numbers (2 * depthsense number code for bad data)
+            x,y = point2[0]/100,point2[1]/100
+            glColor3f(1,0,0)
+            glBegin(GL_LINE_LOOP);
+            for i in range(0,360):
+                glVertex3f(x + cos(radians(i)*radius/100), y + sin(radians(i)*radius/100, -1))
             glEnd()
 
 
