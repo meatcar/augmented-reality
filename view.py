@@ -198,24 +198,9 @@ class View:
 
     def draw_lines(self):
         glLineWidth(3);
-<<<<<<< HEAD
-        #glColor3f(1, 0, 0);
-        point1 = self.dots.dots[0]
-        for i in range(1, len(self.dots.dots), 3):
-            point2 = self.dots.dots[i]
-            glBegin(GL_LINES)
-            glVertex3f(self.head.x + point1[0]/100,
-                       self.head.y + point1[1]/100,
-                       point1[2]/100*-1)
-            glVertex3f(self.head.x + point2[0]/100,
-                       self.head.y + point2[1]/100,
-                       point2[2]/100*-1)
-=======
         
+	# decide if two new points are useful
         point1, point2 = self.dots.getLastTwo()
-        #print(point1, point2)
-        
-        # decide if two new points are useful
         if point1 and point2 and not \
             ((point1[0] > 62000 or point1[1] > 62000 or point1[2] > 62000) or \
             (point2[0] > 62000 or point2[1] > 62000 or point2[2] > 62000)):
@@ -258,7 +243,7 @@ class View:
             # normalize the vecotr (will rescale with the distance we need to cover)
             ns = math.sqrt(sx*sx + sy*sy + sz*sz)
             #print(sx/ns, sy/ns, sz/ns, distance)
-
+            
             # store points with updated location (deals with the redrawing problem later)
             self.points.append((self.head.x + point1[0]/100 - sx/ns*distance, self.head.y + point1[1]/100 - sy/ns*distance, point1[2]/100))
             self.points.append((self.head.x + point2[0]/100 - sx/ns*distance, self.head.y + point2[1]/100 - sy/ns*distance, point2[2]/100))
@@ -274,9 +259,9 @@ class View:
         for point in self.points[1:]:
 
             # pick colour based on depth
-            red = (1 - ((point0[2] + point[2])%50)/50)/8 # doesnt matter what we do here
+            red = (1 - ((point0[2] + point[2])%50)/50)/4 # doesnt matter what we do here
             blue = 1 - (((point0[2] + point[2])%50)/50) # doesnt matter what we do here
-            green = (1 -  ((point0[2] + point[2])%50)/50)/8 # doesnt matter what we do here
+            green = (1 -  ((point0[2] + point[2])%50)/50)/4 # doesnt matter what we do here
             glColor3f(red,green,blue)
 
             glVertex3f(point0[0] ,
@@ -300,7 +285,6 @@ class View:
             glBegin(GL_LINE_LOOP);
             for i in range(0,360):
                 glVertex2f(x + cos(radians(i)*radius/100), y + sin(radians(i)*radius/100))
->>>>>>> 7b6af8a7a2f14b94efeda90b1177b7f3810c9e3c
             glEnd()
 
 
