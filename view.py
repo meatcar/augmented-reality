@@ -203,19 +203,27 @@ class View:
 
     def draw_lines(self):
         glLineWidth(3);
-        #glColor3f(1, 0, 0);
-        point1 = self.dots.dots[0]
-        for i in range(1, len(self.dots.dots), 2):
-            point2 = self.dots.dots[i]
+        
+        point1, point2 = self.dots.getLastTwo()
+        if point1 and point2:
+
+            # pick colour based on depth
+            red = ((point1[2] + point2[2]) * 300 % 255)/255 
+            blue = ((point1[2] + point2[2]) * 1010 % 255)/255 
+            green = ((point1[2] + point2[2]) * 666 % 255)/255 
+            glColor3f(red,green,blue)
+
+            # only draw last two points 
             glBegin(GL_LINES)
             glVertex3f(self.head.x + point1[0]/100,
-                       self.head.y + point1[1]/100,
-                       point1[2]/100*-1)
+                   self.head.y + point1[1]/100,
+                   point1[2]/100*-1)
             glVertex3f(self.head.x + point2[0]/100,
-                       self.head.y + point2[1]/100,
-                       point2[2]/100*-1)
+                   self.head.y + point2[1]/100,
+                   point2[2]/100*-1)
             glEnd()
-            point1 = point2
+
+
 
 if __name__ == "__main__":
     thing = View()

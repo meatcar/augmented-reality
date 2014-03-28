@@ -3,7 +3,7 @@ from shape import Shape
 from view import View
 from dots import Dots
 from handtracker import HandTracker
-from controller import Controller
+#from controller import Controller
 from key_controller import KeyController
 
 if __name__ == "__main__":
@@ -16,8 +16,8 @@ if __name__ == "__main__":
     view = View(head=head, shape=shape, dots=dots)
 
     handtracker = HandTracker(dots)
-    controller = Controller(head)
-    #keycontroller = KeyController(head, shape)
+    #controller = Controller(head)
+    keycontroller = KeyController(head, shape)
 
     view.run()
 
