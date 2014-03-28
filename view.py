@@ -199,9 +199,17 @@ class View:
     def draw_lines(self):
         glLineWidth(3);
         
+        # clear out points when neccassary 
+        if (self.dots.is_clean_slate()):
+            self.points = []
+
 	# decide if two new points are useful
+<<<<<<< HEAD
         point1, point2 = self.dots.getLastTwo()
         #print(point1, point2)
+=======
+        point1, point2 = self.dots.get_last_two()
+>>>>>>> e3f0241130f3c2c2ba936a1ee6e8c6e172639a24
         if point1 and point2 and not \
             ((point1[0] > 62000 or point1[1] > 62000 or point1[2] > 62000) or \
             (point2[0] > 62000 or point2[1] > 62000 or point2[2] > 62000)):
@@ -277,7 +285,7 @@ class View:
 
     def draw_circles(self, radius):
         # ignore this func, i wanted to represent hands as circles but .. yea
-        point1, point2 = self.dots.getLastTwo()
+        point1, point2 = self.dots.get_last_two()
         if point1 and point2 and point1 != 64002 and point2 != 64002: # magic numbers (2 * depthsense number code for bad data)
             x,y = point2[0]/100,point2[1]/100
             glColor3f(1,0,0)

@@ -115,22 +115,26 @@ while True:
         if (x_delta < 100 and y_delta < 100):
             points.append(box_point)
 
-            # points that opengl can use
-            print "{},{},{}".format(
-                    vertex[(box_point[0], box_point[1])][0] *-2,
-                    vertex[(box_point[0], box_point[1])][1] *-2,
-                    vertex[(box_point[0], box_point[1])][2] * 2
-                    )
-            sys.stdout.flush()
-
         else:
             # point found faraway from previous point, restart array
             points = []
             points.append(box_point)
+            print "RESET"
+            sys.stdout.flush()
 
     # first point in the scene
     elif (box_center):
         points.append(box_point)
+
+
+    if (box_center):
+       # points that opengl can use
+       print "{},{},{}".format(
+               vertex[(box_point[0], box_point[1])][0] *-2,
+               vertex[(box_point[0], box_point[1])][1] *-2,
+               vertex[(box_point[0], box_point[1])][2] * 2
+               )
+       sys.stdout.flush()
 
 
     # draw lines

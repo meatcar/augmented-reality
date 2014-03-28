@@ -5,6 +5,7 @@ class Dots:
     def __init__(self, arr=None):
         self.dots = []
         self.count = 0
+        self.cleanslate = False
         if arr is not None:
             self.dots += arr
 
@@ -12,11 +13,22 @@ class Dots:
         self.dots += [(x, y, z)]
         self.count += 1
 
-    def getLastTwo(self):
+    def get_last_two(self):
         if self.count > 1:
             self.count = 0
             return self.dots[-1], self.dots[-2]
         return None, None
+
+    def reset(self):
+        self.cleanslate = True
+        self.dots = []
+        self.count = 0
+    
+    def is_clean_slate(self):
+        #TODO: sync on clean slate var
+        slate = self.cleanslate
+        self.cleanslate = False
+        return slate
 
     def __str__(self):
         return self.dots.__str__()
