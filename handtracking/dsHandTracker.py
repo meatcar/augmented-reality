@@ -119,6 +119,8 @@ while True:
             # point found faraway from previous point, restart array
             points = []
             points.append(box_point)
+            print "RESET"
+            sys.stdout.flush()
 
     # first point in the scene
     elif (box_center):

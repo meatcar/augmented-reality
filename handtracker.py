@@ -28,6 +28,10 @@ class HandTracker(object):
     def track(self):
         while True:
             data = self.proc.stdout.readline()
+            if b'RESET\n' == data:
+                self.dots.reset()
+                continue
+            
             points = numpy.fromstring(data, dtype="int32", sep=",")
             self.dots.add(points[0], points[1], points[2])
 
