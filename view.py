@@ -205,7 +205,7 @@ class View:
         glLineWidth(3);
         #glColor3f(1, 0, 0);
         point1 = self.dots.dots[0]
-        for i in range(1, len(self.dots.dots), 2):
+        for i in range(1, len(self.dots.dots), 3):
             point2 = self.dots.dots[i]
             glBegin(GL_LINES)
             glVertex3f(self.head.x + point1[0]/100,
