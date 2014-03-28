@@ -14,6 +14,7 @@ class Dots:
 
     def getLastTwo(self):
         if self.count > 1:
+            self.count = 0
             return self.dots[-1], self.dots[-2]
         return None, None
 
