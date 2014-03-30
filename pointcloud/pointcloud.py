@@ -54,7 +54,7 @@ if __name__ == '__main__':
     glutInitWindowSize(640,480)
     glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB | GLUT_DEPTH)
     #glEnable(GL_DEPTH_TEST)
-    glutCreateWindow("Scatter")
+    glutCreateWindow("Point Cloud")
 
     glutDisplayFunc(displayFun)
 
