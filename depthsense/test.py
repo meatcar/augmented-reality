@@ -23,15 +23,17 @@ while True:
     image = image[:,:,::-1]
     iS = Image(image.transpose([1,0,2]))
     #iS.show()
-    dblobs = iD.findBlobs()
-    if dblobs:
-        dblobs.draw()
-    c+=1
-    #iD.show()
-    if c > 10000:
-        ds.killDepthSense()
-        break
 
     #print ds.getAcceleration()
-    iV.sideBySide(iD).show()
+
+    uv = ds.getUVMap()
+
+    sync = ds.getSyncMap()
+    sync = sync[:,:,::-1]
+    iY = Image(sync.transpose([1,0,2]))
+    iY.show()
+    
+    
+    #iV.sideBySide(iD).show()
+    c+=1
 
