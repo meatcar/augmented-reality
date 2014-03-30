@@ -37,8 +37,10 @@ def displayFun():
         for j in range(0, 320):
             v = vertex[i][j]
             c = sync[i][j]
-            if not(all(v) == 0) and not (any(v) == 32001):
-                glColor3f(c[0]/255.0,c[1]/255.0, c[2]/255.0)
+            if ((not (all(v) == 0)) and \
+                    (not (any(v) == 32001)) and \
+                    (not (all(c) == 0))):
+                glColor3ub(c[2],c[1], c[0])
                 #glVertex3s(v[0], v[1], v[2])
                 glVertex3s(v[0], v[1], v[2]*-1)
                 #glVertex2s(v[0] + 320, v[1] + 240)
@@ -51,7 +53,7 @@ if __name__ == '__main__':
     glutInit()    
     glutInitWindowSize(640,480)
     glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB | GLUT_DEPTH)
-    glEnable(GL_DEPTH_TEST)
+    #glEnable(GL_DEPTH_TEST)
     glutCreateWindow("Scatter")
 
     glutDisplayFunc(displayFun)
