@@ -35,6 +35,15 @@ def displayFun():
         b=getRandom(randMode)
     glEnd()
     glFlush()
+    print "done"
+
+def on_timer(value=0):
+        # TODO: track actual time, since GLUT does not guarantee actual time
+        #       passed
+        glutPostRedisplay();
+        glutTimerFunc(1000//24, on_timer, value + 1)
+
+
 
 if __name__ == '__main__':
     glutInit()    
@@ -43,4 +52,5 @@ if __name__ == '__main__':
     glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB)
     glutDisplayFunc(displayFun)
     initFun()
+    on_timer()
     glutMainLoop()
