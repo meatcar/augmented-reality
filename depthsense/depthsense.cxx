@@ -71,6 +71,7 @@ static int32_t cH = 480;
 int dshmsz = dW*dH*sizeof(uint16_t);
 int cshmsz = cW*cH*sizeof(uint8_t);
 int vshmsz = dW*dH*sizeof(int16_t);
+int ushmsz = dW*dH*sizeof(float);
 
 // shared mem depth maps
 static uint16_t *depthMap;
@@ -88,11 +89,17 @@ static uint8_t *colourFullMap;
 static float *accelMap;
 static float *accelFullMap;
 
+// shared mem uv maps
+static float *uvMap;
+static float *uvFullMap;
+
 // internal map copies
 static uint8_t colourMapClone[640*480*3];
 static uint16_t depthMapClone[320*240];
 static int16_t vertexMapClone[320*240*3];
 static float accelMapClone[3];
+static float uvMapClone[320*240*2];
+static uint8_t syncMapClone[320*240*3];
 
 int child_pid = 0;
 
@@ -129,8 +136,6 @@ static void onNewAudioSample(AudioNode node, AudioNode::NewSampleReceivedData da
     g_aFrames++;
 }
 
-
-
 /*----------------------------------------------------------------------------*/
 // New color sample event handler
 static void onNewColorSample(ColorNode node, ColorNode::NewSampleReceivedData data)
@@ -150,9 +155,10 @@ static void onNewDepthSample(DepthNode node, DepthNode::NewSampleReceivedData da
     dptrSwap(&depthMap, &depthFullMap);
 
     // Verticies
+    Vertex vertex;
     for(int i=0; i < dH; i++) {
         for(int j=0; j < dW; j++) {
-            Vertex vertex = data.vertices[i*dW + j];
+            vertex = data.vertices[i*dW + j];
             vertexMap[i*dW*3 + j*3 + 0] = vertex.x;
             vertexMap[i*dW*3 + j*3 + 1] = vertex.y;
             vertexMap[i*dW*3 + j*3 + 2] = vertex.z;
@@ -161,6 +167,20 @@ static void onNewDepthSample(DepthNode node, DepthNode::NewSampleReceivedData da
         }
     }
     vptrSwap(&vertexMap, &vertexFullMap);
+
+    // uv
+    UV uv;
+    for(int i=0; i < dH; i++) {
+        for(int j=0; j < dW; j++) {
+            uv = data.uvMap[i*dW + j];
+            uvMap[i*dW*2 + j*2 + 0] = uv.u;
+            uvMap[i*dW*2 + j*2 + 1] = uv.v;
+            //cout << uv.u << uv.v << endl;
+
+        }
+    }
+    aptrSwap(&uvMap, &uvFullMap);
+
 
     // Acceleration
     accelMap[0] = data.acceleration.x;
@@ -228,6 +248,7 @@ static void configureDepthNode()
         g_dnode.setEnableDepthMap(true);
         g_dnode.setEnableVertices(true);
         g_dnode.setEnableAccelerometer(true);
+        g_dnode.setEnableUvMap(true);
 
         g_dnode.setConfiguration(config);
 
@@ -400,7 +421,8 @@ extern "C" {
             munmap(colourFullMap, cshmsz*3);
             munmap(vertexMap, vshmsz*3);
             munmap(vertexFullMap, vshmsz*3);
-
+            munmap(uvMap, ushmsz*2);
+            munmap(uvFullMap, ushmsz*2);
 
     }
 }
@@ -450,6 +472,18 @@ static void initds()
         perror("mmap: cannot alloc shmem;");
         exit(1);
     }
+
+    // shared mem double buffers
+    if ((uvMap = (float *) mmap(NULL, ushmsz*2, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
+        perror("mmap: cannot alloc shmem;");
+        exit(1);
+    }
+
+    if ((uvFullMap = (float *) mmap(NULL, ushmsz*2, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
+        perror("mmap: cannot alloc shmem;");
+        exit(1);
+    }
+
 
     child_pid = fork();
     // child goes into loop
@@ -522,6 +556,53 @@ static PyObject *getVertex(PyObject *self, PyObject *args)
     return PyArray_SimpleNewFromData(3, dims, NPY_INT16, vertexMapClone);
 }
 
+static PyObject *getUV(PyObject *self, PyObject *args)
+{
+    npy_intp dims[3] = {dH, dW, 3};
+    memcpy(uvMapClone, uvFullMap, ushmsz*2);
+    return PyArray_SimpleNewFromData(3, dims, NPY_FLOAT32, uvMapClone);
+}
+
+static PyObject *getSync(PyObject *self, PyObject *args)
+{
+    npy_intp dims[3] = {dH, dW, 3};
+
+    memcpy(uvMapClone, uvFullMap, ushmsz*2);
+    memcpy(colourMapClone, colourFullMap, cshmsz*3);
+    
+    int cind;
+    uint8_t colx;
+    uint8_t coly;
+    uint8_t colz;
+    float uvx;
+    float uvy;
+
+    for(int i=0; i < dH; i++) {
+        for(int j=0; j < dW; j++) {
+            uvx = uvMapClone[i*dW*2 + j*2 + 0];    
+            uvy = uvMapClone[i*dW*2 + j*2 + 1];    
+            colx = 0;
+            coly = 0;
+            colz = 0;
+            
+            if(uvx > 0 && uvx < 1 && uvy > 0 && uvy < 1) {
+                cind = (((int)(uvy*((float)cH)))*cW + (int)(uvx*((float)cW)))*3;
+                colx = colourMapClone[cind + 0];
+                coly = colourMapClone[cind + 1];
+                colz = colourMapClone[cind + 2];
+            }
+          
+            syncMapClone[i*dW*3 + j*3 + 0] = colx;
+            syncMapClone[i*dW*3 + j*3 + 1] = coly;
+            syncMapClone[i*dW*3 + j*3 + 2] = colz;
+
+        }
+    }
+
+    return PyArray_SimpleNewFromData(3, dims, NPY_UINT8, syncMapClone);
+}
+
+
 static PyObject *initDepthS(PyObject *self, PyObject *args)
 {
     initds();
@@ -538,6 +619,8 @@ static PyMethodDef DepthSenseMethods[] = {
     {"getDepthMap",  getDepth, METH_VARARGS, "Get Depth Map"},
     {"getColourMap",  getColour, METH_VARARGS, "Get Colour Map"},
     {"getVertices",  getVertex, METH_VARARGS, "Get Vertex Map"},
+    {"getUVMap",  getUV, METH_VARARGS, "Get UV Map"},
+    {"getSyncMap",  getSync, METH_VARARGS, "Get Colour Overlay Map"},
     {"getAcceleration",  getAccel, METH_VARARGS, "Get Acceleration"},
     {"initDepthSense",  initDepthS, METH_VARARGS, "Init DepthSense"},
     {"killDepthSense",  killDepthS, METH_VARARGS, "Kill DepthSense"},
