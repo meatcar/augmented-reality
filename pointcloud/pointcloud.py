@@ -8,19 +8,20 @@ ds.initDepthSense()
 
 def on_timer(value=0):
         glutPostRedisplay();
-        glutTimerFunc(1000//30, on_timer, value + 1)
+        glutTimerFunc(1000/60, on_timer, value + 1)
 
 
 def initFun():
     glMatrixMode(GL_PROJECTION)
     glClearColor(1.0,1.0,1.0,0.0)
     glColor3f(0.0,0.0, 0.0)
-    glPointSize(1.0)
+    glPointSize(4.0)
     glMatrixMode(GL_PROJECTION)
     glLoadIdentity()
     #gluOrtho2D(0.0,400.0,0.0,400.0)
+    #glOrtho(-320,320,-240,240,0.1,1000)
     gluPerspective(45, 640.0/480.0, 0.1, 1000) 
-    gluLookAt(0,0,1, 0,0,0, 0,1,0) 
+    #gluLookAt(0,0,1, 0,0,0, 0,1,0) 
     
 
     
@@ -53,7 +54,7 @@ if __name__ == '__main__':
     glutInit()    
     glutInitWindowSize(640,480)
     glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB | GLUT_DEPTH)
-    #glEnable(GL_DEPTH_TEST)
+    glEnable(GL_DEPTH_TEST)
     glutCreateWindow("Point Cloud")
 
     glutDisplayFunc(displayFun)
