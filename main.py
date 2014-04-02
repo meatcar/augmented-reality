@@ -5,6 +5,7 @@ from dots import Dots
 from handtracker import HandTracker
 #from controller import Controller
 from key_controller import KeyController
+from constants import Mode
 
 if __name__ == "__main__":
     head = Head()
@@ -13,11 +14,15 @@ if __name__ == "__main__":
     #dots.add(0,0,0)
 
     # Cube
-    view = View(head=head, shape=shape, dots=dots)
+    view = View(head=head, shape=shape, dots=dots, mode=Mode.KEY_MODE)
 
     handtracker = HandTracker(dots)
     #controller = Controller(head)
     keycontroller = KeyController(head, shape)
-
-    view.run()
+    
+    try:
+        view.run()
+    finally:
+        # cleans up the mess we make after a kill
+        handtracker.proc.kill()
 
