@@ -11,7 +11,6 @@ if __name__ == "__main__":
     head = Head()
     shape = Shape(height=0.4, width=0.4, x=0, y=0, z=-9)
     dots = Dots()
-    #dots.add(0,0,0)
 
     # Cube
     view = View(head=head, shape=shape, dots=dots, mode=Mode.KEY_MODE)
