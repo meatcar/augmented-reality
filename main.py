@@ -3,7 +3,7 @@ from shape import Shape
 from view import View
 from dots import Dots
 from handtracker import HandTracker
-#from controller import Controller
+from controller import Controller
 from key_controller import KeyController
 from constants import Mode
 
@@ -13,11 +13,12 @@ if __name__ == "__main__":
     dots = Dots()
 
     # Cube
-    view = View(head=head, shape=shape, dots=dots, mode=Mode.KEY_MODE)
+    view = View(head=head, shape=shape, dots=dots, mode=Mode.MPU_MODE)
 
-    handtracker = HandTracker(dots)
-    #controller = Controller(head)
-    keycontroller = KeyController(head, shape)
+    #handtracker = HandTracker(dots)
+    controller = Controller(head, use_phidget=False, use_MPU=True)
+    
+    #keycontroller = KeyController(head, shape)
     
     try:
         view.run()
