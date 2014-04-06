@@ -11,6 +11,7 @@ from head import Head
 from threading import Thread
 from collections import deque
 from phidgetwrapper import PhidgetWrapper
+from mpuwrapper import MPUWrapper
 
 class Controller(object):
 
@@ -28,20 +29,64 @@ class Controller(object):
     # stores roll pitch yaw initial values.
     first = [-1000, -1000, -1000]
     imu_measurements = {"acc" : [], "gyr" : [], "mag" : [], "time" : []}
+    
+    # mpu measurements
+    # 
+    # the calibrated measurements have been passed through a low pass filter.
+    # 
+    # l_acc - linear accleration data
+    # r_acc - raw acceleration data
+    # r_gyr - raw gyro data
+    # r_mag - raw magnetic data
+    # c_acc - calibrated acceleration data
+    # c_mag - calibrated magnetic data
+    # e_ang - Euler angles with reference to the earth frame
+    # r_quat - the raw quaternion
+    # c_quat - calculated quaternion
+    # fe_ang - fused euler pose.
+    # res_acc ` residual acceleration (supposed to be tilt compensated.)
+    mpu_measurements = {"l_acc": [],
+        "r_acc" : [], "r_gyr" : [], "r_mag" : [],
+        "c_acc" : [], "c_mag" : [], 
+        "e_ang" : [], "fe_ang" : [], 
+        "c_quat" : [], "r_quat" : [],
+        "res_acc" : [] }
 
-    def __init__(self, head):
-        self.phidget = PhidgetWrapper(self.on_data)
+    def __init__(self, head, use_phidget=True, use_MPU=True, device="/dev/ttyACM0", speed=115200):
+        self.use_phidget = use_phidget
+        self.use_MPU = use_MPU
+
+        if use_phidget:
+            self.phidget = PhidgetWrapper(self.on_phidget_data)
+    
+        if use_MPU:
+            self.mpu = MPUWrapper(device, speed, self.on_mpu_data)
+
         self.head = head
 
         self.t = Thread(target=self.update_head)
         self.t.daemon = True
         self.t.start()
 
-    def on_data(self, acc, gyr, mag, microseconds):
+    def on_phidget_data(self, acc, gyr, mag, microseconds):
         Controller.imu_measurements["acc"].append(acc)
         Controller.imu_measurements["gyr"].append(gyr)
         Controller.imu_measurements["mag"].append(mag)
         Controller.imu_measurements["time"].append(microseconds)
+
+    def on_mpu_data(self, l_acc, r_acc, r_gyr, r_mag, c_acc, c_mag, e_ang, 
+        r_quat, c_quat, fe_ang, res_acc):
+        Controller.mpu_measurements["l_acc"].append(l_acc);
+        Controller.mpu_measurements["r_acc"].append(r_acc);
+        Controller.mpu_measurements["r_gyr"].append(r_gyr);
+        Controller.mpu_measurements["r_mag"].append(r_mag);
+        Controller.mpu_measurements["c_acc"].append(l_acc);
+        Controller.mpu_measurements["c_mag"].append(c_mag);
+        Controller.mpu_measurements["e_ang"].append(e_ang);
+        Controller.mpu_measurements["r_quat"].append(r_quat);
+        Controller.mpu_measurements["c_quat"].append(c_quat);
+        Controller.mpu_measurements["fe_ang"].append(fe_ang);
+        Controller.mpu_measurements["res_acc"].append(res_acc);
 
     def process_data(self, acc, gyr, mag, del_t):
         delta = 2;
@@ -148,13 +193,24 @@ class Controller(object):
 
     def update_head(self):
         while True:
-            if len(Controller.imu_measurements["acc"]) >= 6:
-                data = copy(Controller.imu_measurements)
-                self.process_data(data["acc"], data["gyr"], data["mag"], None);
-                Controller.imu_measurements["acc"] = Controller.imu_measurements["acc"][1:]
-                Controller.imu_measurements["gyr"] = Controller.imu_measurements["gyr"][1:]
-                Controller.imu_measurements["mag"] = Controller.imu_measurements["mag"][1:]
-                Controller.imu_measurements["time"] = Controller.imu_measurements["time"][1:]
+            if self.use_MPU and not self.use_phidget:
+                if len(Controller.mpu_measurements["fe_ang"]) > 0:
+                    angles = Controller.mpu_measurements["fe_ang"][-1]
+                    print(angles)
+                    self.head.xangle = math.radians(angles[0])
+                    self.head.yangle = math.radians(angles[1])
+                    self.head.zangle = math.radians(angles[2])
+
+            elif self.use_phidget and not self.use_MPU:
+                if len(Controller.imu_measurements["acc"]) >= 6:
+                    data = copy(Controller.imu_measurements)
+                    self.process_data(data["acc"], data["gyr"], data["mag"], None);
+                    Controller.imu_measurements["acc"] = Controller.imu_measurements["acc"][1:]
+                    Controller.imu_measurements["gyr"] = Controller.imu_measurements["gyr"][1:]
+                    Controller.imu_measurements["mag"] = Controller.imu_measurements["mag"][1:]
+                    Controller.imu_measurements["time"] = Controller.imu_measurements["time"][1:]
+            elif self.use_phidget and self.use_MPU:
+                print("ok")
 
 if __name__ == "__main__":
     h = Head()

@@ -9,9 +9,10 @@ import sys
 
 import head
 import shape
+from constants import Mode
 
 class View:
-    def __init__(self, head, shape, dots):
+    def __init__(self, head, shape, dots, mode=Mode.IMU_MODE):
         # GLUT initialization in program global, so initialize it on
         # the process level. It might be
         glutInit(sys.argv)
@@ -22,7 +23,7 @@ class View:
         self.fps = 60
         self.width = 0
         self.height = 0
-        
+        self.mode = mode 
         self.points = []
 
         glutInitDisplayMode(GLUT_RGBA)
@@ -79,6 +80,30 @@ class View:
             print(e)
             sys.exit(1)
 
+    def get_direction(self):
+        x_vec, y_vec, z_vec = 0, 0, 0
+
+        if self.mode == Mode.KEY_MODE: 
+            # angles come from mouse movement, 3 degress of freedom
+            x_vec = cos(radians(self.head.xangle))
+            y_vec = cos(radians(self.head.yangle))
+            z_vec = -1*cos(radians(self.head.zangle))
+
+        if self.mode == Mode.IMU_MODE:
+            # IMU is expected to be mounted sideways, roll is ignored, expects euler angles
+            x_vec = cos(self.head.zangle) * cos(self.head.yangle)
+            y_vec = sin(self.head.zangle) * cos(self.head.yangle)
+            z_vec = sin(self.head.yangle)
+
+        if self.mode == Mode.MPU_MODE:
+            # TODO: MPU has 3 degress of freedom
+            x_vec = cos(self.head.zangle) * cos(self.head.yangle)
+            y_vec = sin(self.head.zangle) * cos(self.head.yangle)
+            z_vec = sin(self.head.yangle)
+    
+        return x_vec, y_vec, z_vec
+
+
     def draw(self):
         glViewport(0, 0, self.width//2, self.height)
 
@@ -118,6 +143,8 @@ class View:
 
         # cut of from z=-1 to z=-1000
         gluPerspective(self.head.fov, screen_ratio, 0.02, 1000)
+
+        x_vec, y_vec, z_vec = self.get_direction()
         gluLookAt(
                 #                @ object
                 #    +--------+ /
@@ -130,16 +157,10 @@ class View:
                 (self.head.eye_distance * offset) + self.head.x,
                 self.head.y,
                 self.head.z + 1,
-
-                # Key controller mode
-                cos(radians(self.head.xangle)) * distance,
-                cos(radians(self.head.yangle)) * distance,
-                -1*cos(radians(self.head.zangle)) * distance,
-
-                # IMU mode 
-                #math.cos(self.head.zangle)*math.cos(self.head.yangle),
-                #math.sin(self.head.zangle)*math.cos(self.head.yangle),
-                #math.sin(self.head.yangle),
+                
+                x_vec,
+                y_vec,
+                z_vec,
 
                 # the up vector in the final view.
                 0, 1, 0
@@ -157,7 +178,7 @@ class View:
 
         glMatrixMode(GL_MODELVIEW)
         glPushMatrix()
-
+        self.draw_room()
         # rotate shape
         glRotatef(self.shape.zangle, 0, 0, 1)
         glRotatef(self.shape.yangle, 0, 1, 0)
@@ -165,9 +186,20 @@ class View:
 
         #if self.shape is not None:
             #self.draw_shape()
+
         if self.dots is not None:
             self.draw_lines()
 
+        glPopMatrix()
+
+
+    def draw_room(self):
+    
+        glPushMatrix()
+        #glColor3f(0.2, 0.5, 0.8)
+        glScalef(50,50,200)
+        #glTranslatef(0,0, -100)
+        self.draw_cube()
         glPopMatrix()
 
 
@@ -201,7 +233,8 @@ class View:
         
         # clear out points when neccassary 
         if (self.dots.is_clean_slate()):
-            self.points = []
+            #self.points = []
+            pass
 
 	# decide if two new points are useful
         #print(point1, point2)
@@ -235,19 +268,11 @@ class View:
                 (self.head.z - point2[2]/100) ** 2
             )
 
-            # using mouse/keyboard angles (i left distance in there but it should be removed)
-            sx, sy, sz = cos(radians(self.head.xangle)) * distance, \
-                    cos(radians(self.head.yangle)) * distance, \
-                    -1*cos(radians(self.head.zangle)) * distance
-            
-            # using imu angles
-            #sx, sy, sz = math.cos(self.head.zangle)*math.cos(self.head.yangle), \
-            #    math.sin(self.head.zangle)*math.cos(self.head.yangle), \
-            #    math.sin(self.head.yangle),
-                
-            # normalize the vecotr (will rescale with the distance we need to cover)
+            sx, sy, sz = self.get_direction()
+            # normalize the vector (will rescale with the distance we need to cover)
             ns = math.sqrt(sx*sx + sy*sy + sz*sz)
             #print(sx/ns, sy/ns, sz/ns, distance)
+
             # store points with updated location (deals with the redrawing problem later)
             self.points.append((self.head.x + point1[0]/100 - sx/ns*distance, self.head.y + point1[1]/100 - sy/ns*distance, point1[2]/100))
             self.points.append((self.head.x + point2[0]/100 - sx/ns*distance, self.head.y + point2[1]/100 - sy/ns*distance, point2[2]/100))
@@ -290,6 +315,51 @@ class View:
             for i in range(0,360):
                 glVertex2f(x + cos(radians(i)*radius/100), y + sin(radians(i)*radius/100))
             glEnd()
+    
+    def draw_cube(self):
+        glBegin(GL_QUADS)
+        #glNormal3f( 0.0,  0.0, 1.0)
+        #glVertex3f(-1.0, -1.0, 1.0)
+        #glVertex3f( 1.0, -1.0, 1.0)
+        #glVertex3f( 1.0,  1.0, 1.0)
+        #glVertex3f(-1.0,  1.0, 1.0)
+        
+        glColor3f(0.2, 0.5, 1.0)
+        glNormal3f( 0.0,  0.0, -1.0)
+        glVertex3f( 1.0, -1.0, -1.0)
+        glVertex3f(-1.0, -1.0, -1.0)
+        glVertex3f(-1.0,  1.0, -1.0)
+        glVertex3f( 1.0,  1.0, -1.0)
+        
+        glColor3f(0.4, 0.5, 0.8)
+        glNormal3f(-1.0,  0.0,  0.0)
+        glVertex3f(-1.0, -1.0, -1.0)
+        glVertex3f(-1.0, -1.0,  1.0)
+        glVertex3f(-1.0,  1.0,  1.0)
+        glVertex3f(-1.0,  1.0, -1.0)
+        
+        glColor3f(0.2, 0.4, 0.8)
+        glNormal3f( 1.0,  0.0,  0.0)
+        glVertex3f( 1.0, -1.0,  1.0)
+        glVertex3f( 1.0, -1.0, -1.0)
+        glVertex3f( 1.0,  1.0, -1.0)
+        glVertex3f( 1.0,  1.0,  1.0)
+        
+        glColor3f(0.2, 0.2, 0.8)
+        glNormal3f( 0.0,  1.0,  0.0)
+        glVertex3f(-1.0,  1.0,  1.0)
+        glVertex3f( 1.0,  1.0,  1.0)
+        glVertex3f( 1.0,  1.0, -1.0)
+        glVertex3f(-1.0,  1.0, -1.0)
+        
+        glColor3f(0.5, 0.5, 0.8)
+        glNormal3f( 0.0, -1.0,  0.0)
+        glVertex3f(-1.0, -1.0, -1.0)
+        glVertex3f( 1.0, -1.0, -1.0)
+        glVertex3f( 1.0, -1.0,  1.0)
+        glVertex3f(-1.0, -1.0,  1.0)
+        glEnd()
+
 
 
 
