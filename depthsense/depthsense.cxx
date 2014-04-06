@@ -569,8 +569,9 @@ static PyObject *getSync(PyObject *self, PyObject *args)
 
     memcpy(uvMapClone, uvFullMap, ushmsz*2);
     memcpy(colourMapClone, colourFullMap, cshmsz*3);
+    memcpy(depthMapClone, depthFullMap, dshmsz);
     
-    int cind;
+    int ci, cj;
     uint8_t colx;
     uint8_t coly;
     uint8_t colz;
@@ -585,13 +586,16 @@ static PyObject *getSync(PyObject *self, PyObject *args)
             coly = 0;
             colz = 0;
             
-            if(uvx > 0 && uvx < 1 && uvy > 0 && uvy < 1) {
-                cind = (((int)(uvy*((float)cH)))*cW + (int)(uvx*((float)cW)))*3;
-                colx = colourMapClone[cind + 0];
-                coly = colourMapClone[cind + 1];
-                colz = colourMapClone[cind + 2];
+            if((uvx > 0 && uvx < 1 && uvy > 0 && uvy < 1) && 
+                (depthMapClone[i*dW + j] < 32000)){
+                ci = (int) (uvy * ((float) cH));
+                cj = (int) (uvx * ((float) cW));
+                colx = colourMapClone[ci*cW*3 + cj*3 + 0];
+                coly = colourMapClone[ci*cW*3 + cj*3 + 1];
+                colz = colourMapClone[ci*cW*3 + cj*3 + 2];
             }
           
+            
             syncMapClone[i*dW*3 + j*3 + 0] = colx;
             syncMapClone[i*dW*3 + j*3 + 1] = coly;
             syncMapClone[i*dW*3 + j*3 + 2] = colz;
