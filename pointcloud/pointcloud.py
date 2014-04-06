@@ -39,7 +39,7 @@ def cameraFun():
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST)
     gluPerspective(45, 640.0/480.0, 0.1, 2000) 
-    gluLookAt(0,0,10, 
+    gluLookAt(0,0,1, 
             sin(theta)*cos(phi),
             sin(theta)*sin(phi),
             cos(theta) - 1, 
