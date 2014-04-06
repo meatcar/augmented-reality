@@ -6,6 +6,7 @@ from head import Head
 import numpy as np
 from math import sin,cos,tan,radians,pi
 import DepthSense as ds
+from ctypes import c_float
 
 zmov = 0
 xmov = 0
@@ -13,6 +14,8 @@ prevz = 0
 prevx = 0 
 theta = pi/2
 phi = 0
+vvbo = None
+cvbo = None
 
 def on_timer(value=0):
         glutPostRedisplay();
@@ -28,14 +31,18 @@ def initFun():
     glEnable(GL_DEPTH_TEST)
     glutCreateWindow("Point Cloud")
 
+    global vvbo
+    global cvbo
+    glEnableClientState(GL_VERTEX_ARRAY)
+    vvbo = glGenBuffers(1)
+    cvbo = glGenBuffers(1)
+
 def cameraFun():
 
     # Create Camera
     glMatrixMode(GL_PROJECTION)
     glLoadIdentity()
     glViewport(0, 0, 640, 480)
-    #glClearDepth(1) 
-    #glClear(GL_COLOR_BUFFER_BIT)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST)
     gluPerspective(45, 640.0/480.0, 0.1, 2000) 
@@ -45,8 +52,6 @@ def cameraFun():
             cos(theta) - 1, 
             0,1,0) 
 
-    #gluOrtho2D(0.0,400.0,0.0,400.0)
-    #glOrtho(-320,320,-240,240,0.1,1000)
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
     glClearColor(1.0,1.0,1.0,0.0)
@@ -73,16 +78,21 @@ def keyFun(key, x, y):
 def displayFun():
     
     cameraFun()
+    global vvbo
+    global cvbo
 
     glMatrixMode(GL_MODELVIEW)
     glLoadIdentity()
     
     vertex = ds.getVertices()
     sync = ds.getSyncMap()
-    print ds.getAcceleration()
+    #print ds.getAcceleration()
 
     glPushMatrix()
-    glBegin(GL_POINTS)
+    #glBegin(GL_POINTS)
+    vpoints = []
+    cpoints = []
+    counter = 0
     for i in range(0,240):
         for j in range(0, 320):
             v = vertex[i][j]
@@ -90,11 +100,33 @@ def displayFun():
             if ((not (all(v) == 0)) and \
                     (not (any(v) == 32001)) and \
                     (not (all(c) == 0))):
-                glColor3ub(c[2],c[1], c[0])
+
+                vpoints += [float(v[0]), float(v[1]), float(v[2]*-1)]
+                cpoints += [c[2]/255.0,c[1]/255.0, c[0]/255.0]
+                counter += 1
+
+                #glColor3ub(c[2],c[1], c[0])
                 #glVertex3s(v[0], v[1], v[2])
-                glVertex3s(v[0], v[1], v[2]*-1)
+                #glVertex3s(v[0], v[1], v[2]*-1)
                 #glVertex2s(v[0] + 320, v[1] + 240)
-    glEnd()
+
+
+    if counter > 0:
+        #glEnableVertexAttribArray(1)
+
+        #glBindBuffer(GL_ARRAY_BUFFER, cvbo)
+        #glBufferData(GL_ARRAY_BUFFER, len(cpoints)*4, (GLfloat * len(cpoints))(*cpoints), GL_STATIC_DRAW)
+        #glColorPointer(3, GL_FLOAT, 0, None)
+     
+        glBindBuffer(GL_ARRAY_BUFFER, vvbo)
+        glBufferData(GL_ARRAY_BUFFER, len(vpoints)*4, (GLfloat * len(vpoints))(*vpoints), GL_STATIC_DRAW)
+        glVertexPointer(3, GL_FLOAT, 0, None)
+
+        #glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0)
+        #glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0)
+        glDrawArrays(GL_POINTS, 0, len(vpoints)/3)
+        #glDisableVertexAttribArray(0)
+
     glPopMatrix()
     glutSwapBuffers()
 
