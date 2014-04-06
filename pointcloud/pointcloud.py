@@ -79,6 +79,7 @@ def displayFun():
     
     vertex = ds.getVertices()
     sync = ds.getSyncMap()
+    print ds.getAcceleration()
 
     glPushMatrix()
     glBegin(GL_POINTS)
