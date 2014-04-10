@@ -4,7 +4,7 @@ from OpenGL.GLU import *
 from PIL import Image
 import numpy
 import math
-from math import sin,cos,tan,radians
+from math import sin,cos,tan,radians,pi
 import sys
 
 import head
@@ -297,6 +297,9 @@ class View:
 
         # redraw all points (TODO: find way of just appending points instead of redrawing everything)
         point0 = self.points[0]
+
+
+        # LINE MODE
         glBegin(GL_LINES)
         for point in self.points[1:]:
 
@@ -316,19 +319,40 @@ class View:
             point0 = point
 
         glEnd()
+        
+        # CIRCLE MODE
+        #for point in self.points[1:]:
+        #    glPushMatrix()
+        #    #TODO: Apply rotation matrix here to rotate tube section in the direction of point - point0
+             # i.e change the normal of the circle from (0,0,-1) (default) to point - point0 by applying a rotation
+        #    glBegin(GL_TRIANGLE_STRIP) 
 
-    def draw_circles(self, radius):
-        # ignore this func, i wanted to represent hands as circles but .. yea
-        point1, point2 = self.dots.get_last_two()
-        if point1 and point2 and point1 != 64002 and point2 != 64002: # magic numbers (2 * depthsense number code for bad data)
-            x,y = point2[0]/100,point2[1]/100
-            glColor3f(1,0,0)
-            # Todo translate 2D circle to the z = -1 plane (i believe its drawn behind the camera now)
-            glBegin(GL_LINE_LOOP);
-            for i in range(0,360):
-                glVertex2f(x + cos(radians(i)*radius/100), y + sin(radians(i)*radius/100))
-            glEnd()
-    
+        #    # pick colour based on depth
+        #    red = ((point0[2] + point[2])%50)/50 # doesnt matter what we do here
+        #    blue = 1 - (((point0[2] + point[2])%50)/50) # doesnt matter what we do here
+        #    green = 0
+
+        #    glColor3f(red,green,blue)
+
+             # DRAW CIRCLE CONNECTING POINT FROM ONE CIRCLE TO THE OTHER
+        #    for i in reversed(range(0,361, 30)):
+        #        theta = i * pi/180.0
+
+        #        x = 1 * cos(theta) + point[0]
+        #        y = 1 * sin(theta) + point[1]
+        #        z = point[2]*-1.5
+
+        #        x0 = 1 * cos(theta) + point0[0]
+        #        y0 = 1 * sin(theta) + point0[1]
+        #        z0 = point0[2]*-1.5
+
+        #        glVertex3f(x0,y0,z0)
+        #        glVertex3f(x,y,z)
+
+        #    glEnd()
+        #    glPopMatrix()
+        #    point0 = point
+
     def draw_cube(self):
         glBegin(GL_QUADS)
         #glNormal3f( 0.0,  0.0, 1.0)
