@@ -411,7 +411,7 @@ static void onDeviceDisconnected(Context context, Context::DeviceRemovedData dat
 extern "C" {
     static void killds(){
         if (child_pid == 0) {
-            printf("hi");
+
         }
         if (child_pid !=0)
             kill(child_pid, SIGTERM);
@@ -524,7 +524,8 @@ static void initds()
 
 }
 /*----------------------------------------------------------------------------*/
-
+/*                       Python Callbacks                                     */
+/*----------------------------------------------------------------------------*/
 static PyObject *getColour(PyObject *self, PyObject *args)
 {
     npy_intp dims[3] = {cH, cW, 3};
@@ -635,6 +636,7 @@ static PyMethodDef DepthSenseMethods[] = {
 PyMODINIT_FUNC initDepthSense(void)
 {
     (void) Py_InitModule("DepthSense", DepthSenseMethods);
+    // Clean up forked process, attach it to the python exit hook
     (void) Py_AtExit(killds);
     import_array();
 }
