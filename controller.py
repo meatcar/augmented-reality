@@ -52,7 +52,7 @@ class Controller(object):
         "c_quat" : [], "r_quat" : [],
         "res_acc" : [] }
 
-    def __init__(self, head, use_phidget=True, use_MPU=True, device="/dev/ttyACM0", speed=115200):
+    def __init__(self, head, use_phidget=False, use_MPU=True, device="/dev/ttyACM0", speed=115200):
         self.use_phidget = use_phidget
         self.use_MPU = use_MPU
 
@@ -199,7 +199,7 @@ class Controller(object):
                     print(angles)
                     self.head.xangle = math.radians(angles[0])
                     self.head.yangle = math.radians(angles[1])
-                    self.head.zangle = math.radians(angles[2])
+                    self.head.zangle = math.radians(angles[2]) - math.radians(0)
 
             elif self.use_phidget and not self.use_MPU:
                 if len(Controller.imu_measurements["acc"]) >= 6:
@@ -212,10 +212,23 @@ class Controller(object):
             elif self.use_phidget and self.use_MPU:
                 print("ok")
 
-if __name__ == "__main__":
-    h = Head()
-    c = Controller(h)
+# if __name__ == "__main__":
+    # head = Head()
+    # c = Controller(head)
 
-    while True:
-        time.sleep(1);
-        print(h)
+    # while True:
+    #     x_a = head.xangle
+    #     y_a = head.yangle
+    #     z_a = head.zangle
+
+    #     print x_a
+    #     print y_a
+    #     print z_a
+    #     print ""
+    #     R_x = np.matrix([[1,0,0],[0,math.cos(x_a),math.sin(x_a)],[0,-math.sin(x_a),math.cos(x_a)]])
+    #     R_y = np.matrix([[math.cos(y_a),0,-math.sin(y_a)],[0,1,0],[math.sin(y_a),0,math.cos(y_a)]])
+    #     R_z = np.matrix([[math.cos(z_a),math.sin(z_a),0],[-math.sin(z_a),math.cos(z_a),0],[0,0,1]])
+    #     v = R_x*R_y*R_z*np.matrix([[1],[0],[0]]);
+    #     print v
+
+    #     time.sleep(1);

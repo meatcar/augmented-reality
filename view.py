@@ -97,10 +97,23 @@ class View:
 
         if self.mode == Mode.MPU_MODE:
             # TODO: MPU has 3 degress of freedom
-            x_vec = cos(self.head.zangle) * cos(self.head.yangle)
-            y_vec = sin(self.head.zangle) * cos(self.head.yangle)
-            z_vec = sin(self.head.yangle)
-    
+            x_vec = sin(self.head.zangle)
+            y_vec = -1* (sin(self.head.xangle)*cos(self.head.zangle))
+            z_vec = -1* (cos(self.head.xangle)*cos(self.head.zangle))
+            # x_a = self.head.xangle
+            # y_a = self.head.yangle
+            # z_a = self.head.zangle
+            # R_x = numpy.matrix([[1,0,0],[0,math.cos(x_a),math.sin(x_a)],[0,-math.sin(x_a),math.cos(x_a)]])
+            # R_y = numpy.matrix([[math.cos(y_a),0,-math.sin(y_a)],[0,1,0],[math.sin(y_a),0,math.cos(y_a)]])
+            # R_z = numpy.matrix([[math.cos(z_a),math.sin(z_a),0],[-math.sin(z_a),math.cos(z_a),0],[0,0,1]])
+
+            # x_vec = cos(self.head.zangle) * cos(self.head.yangle)
+            # y_vec = sin(self.head.zangle) * cos(self.head.yangle)
+            # z_vec = sin(self.head.yangle)
+
+            #v = R_x*R_y*R_z*numpy.matrix([[1],[0],[0]]);
+        
+        #return float(v[0]), float(v[1]), float(v[2])
         return x_vec, y_vec, z_vec
 
 
@@ -158,9 +171,9 @@ class View:
                 self.head.y,
                 self.head.z + 1,
                 
-                x_vec,
-                y_vec,
-                z_vec,
+                x_vec*distance,
+                y_vec*distance,
+                z_vec*distance,
 
                 # the up vector in the final view.
                 0, 1, 0
