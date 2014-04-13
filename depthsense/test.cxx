@@ -4,7 +4,6 @@
 
 using namespace std;
 int main() {
-    //int **matrix = (int **) malloc(sizeof(int)*300);
     int matrix[20][30];
     for(int i = 0; i < 20; i++) {
         for(int j = 0; j < 30; j++) {
