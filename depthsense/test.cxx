@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <list>
 
+// SAMPLE
 using namespace std;
 int main() {
     int matrix[20][30];
