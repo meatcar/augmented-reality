@@ -3,8 +3,7 @@ from OpenGL.GLUT import *
 from OpenGL.GLU import *
 from PIL import Image
 import numpy
-import math
-from math import sin,cos,tan,radians
+from math import sin,cos,tan,radians,pi,sqrt,atan,atan2,acos,asin,degrees
 import sys
 
 import head
@@ -12,7 +11,7 @@ import shape
 from constants import Mode
 
 class View:
-    def __init__(self, head, shape, dots, mode=Mode.IMU_MODE):
+    def __init__(self, head, shape, dots, mode=Mode.IMU_MODE, line_width=3):
         # GLUT initialization in program global, so initialize it on
         # the process level. It might be
         glutInit(sys.argv)
@@ -23,10 +22,12 @@ class View:
         self.fps = 60
         self.width = 0
         self.height = 0
+        self.line_width = line_width
         self.mode = mode 
         self.points = []
 
         glutInitDisplayMode(GLUT_RGBA)
+        glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS)
         #glutInitWindowSize(256,224)
         self.window = glutCreateWindow(b"GL")
 
@@ -97,10 +98,10 @@ class View:
 
         if self.mode == Mode.MPU_MODE:
             # TODO: MPU has 3 degress of freedom
-            x_vec = cos(self.head.zangle) * cos(self.head.yangle)
-            y_vec = sin(self.head.zangle) * cos(self.head.yangle)
-            z_vec = sin(self.head.yangle)
-    
+            x_vec = sin(self.head.zangle)
+            y_vec = -1* (sin(self.head.xangle)*cos(self.head.zangle))
+            z_vec = -1* (cos(self.head.xangle)*cos(self.head.zangle))
+
         return x_vec, y_vec, z_vec
 
 
@@ -126,7 +127,7 @@ class View:
         '''
 
         screen_ratio = 1080/1920
-        distance = math.sqrt(
+        distance = sqrt(
                     (self.head.x - self.shape.x) ** 2 +
                     (self.head.y - self.shape.y) ** 2 +
                     (self.head.z - self.shape.z) ** 2
@@ -158,9 +159,9 @@ class View:
                 self.head.y,
                 self.head.z + 1,
                 
-                x_vec,
-                y_vec,
-                z_vec,
+                x_vec*distance,
+                y_vec*distance,
+                z_vec*distance,
 
                 # the up vector in the final view.
                 0, 1, 0
@@ -188,7 +189,7 @@ class View:
             #self.draw_shape()
 
         if self.dots is not None:
-            self.draw_lines()
+            self.draw_points()
 
         glPopMatrix()
 
@@ -228,8 +229,8 @@ class View:
 
         glEnd();
 
-    def draw_lines(self):
-        glLineWidth(3);
+    def draw_points(self):
+        glLineWidth(self.line_width);
         
         # clear out points when neccassary 
         if (self.dots.is_clean_slate()):
@@ -262,7 +263,7 @@ class View:
             # 
 
             # measure distance to obj from camera/persons head/imu location w.e you wanna call it
-            distance = math.sqrt(
+            distance = sqrt(
                 (self.head.x - point2[0]/100) ** 2 +
                 (self.head.y - point2[1]/100) ** 2 +
                 (self.head.z - point2[2]/100) ** 2
@@ -270,7 +271,7 @@ class View:
 
             sx, sy, sz = self.get_direction()
             # normalize the vector (will rescale with the distance we need to cover)
-            ns = math.sqrt(sx*sx + sy*sy + sz*sz)
+            ns = sqrt(sx*sx + sy*sy + sz*sz)
             #print(sx/ns, sy/ns, sz/ns, distance)
 
             # store points with updated location (deals with the redrawing problem later)
@@ -283,6 +284,11 @@ class View:
             return
 
         # redraw all points (TODO: find way of just appending points instead of redrawing everything)
+        #self.draw_line()
+        self.draw_tube()
+        #self.draw_circles()
+
+    def draw_line(self):
         point0 = self.points[0]
         glBegin(GL_LINES)
         for point in self.points[1:]:
@@ -301,21 +307,87 @@ class View:
                    point[2]*-1)
 
             point0 = point
-
         glEnd()
+        
+    def draw_tube(self):
+        point0 = self.points[0]
+        for point in self.points[1:]:
+            glPushMatrix()
+            glLoadIdentity()
 
-    def draw_circles(self, radius):
-        # ignore this func, i wanted to represent hands as circles but .. yea
-        point1, point2 = self.dots.get_last_two()
-        if point1 and point2 and point1 != 64002 and point2 != 64002: # magic numbers (2 * depthsense number code for bad data)
-            x,y = point2[0]/100,point2[1]/100
-            glColor3f(1,0,0)
-            # Todo translate 2D circle to the z = -1 plane (i believe its drawn behind the camera now)
-            glBegin(GL_LINE_LOOP);
-            for i in range(0,360):
-                glVertex2f(x + cos(radians(i)*radius/100), y + sin(radians(i)*radius/100))
+            #TODO: Apply rotation matrix here to rotate tube section in the direction of point - point0
+            # i.e change the normal of the circle from (0,0,-1) (default) to point - point0 by applying a rotation
+            #TODO: TRANSLATE ALL POINTS TO ORIGIN THEN ROTATE THEN TRANSLATE BACK! Currently rotations are about the camera? or some non 0,0,0 position
+
+            dir_vec = (point[0] - point0[0], point[1] - point0[1], point[2] - point0[2])
+            dir_len = sqrt(dir_vec[0]*dir_vec[0] +  dir_vec[1]*dir_vec[1] +  dir_vec[2]*dir_vec[2]) 
+            dir_theta = 0
+            dir_phi = 0
+            if not (any(dir_vec) == 0):
+                dir_theta = degrees(atan(dir_vec[1]/dir_vec[0]))
+                dir_phi = degrees(asin(dir_vec[2]/dir_len))
+
+            print(dir_vec)
+            print(dir_theta - 0, dir_phi - 0)
+            glRotatef(dir_theta, 1, 0, 0)
+            glRotatef(dir_phi, 0, 1, 0)
+
+            glBegin(GL_TRIANGLE_STRIP) 
+
+            # pick colour based on depth
+            red = ((point0[2] + point[2])%50)/50 # doesnt matter what we do here
+            blue = 1 - (((point0[2] + point[2])%50)/50) # doesnt matter what we do here
+            green = 0
+
+            glColor3f(red,green,blue)
+
+            # DRAW CIRCLE CONNECTING POINT FROM ONE CIRCLE TO THE OTHER
+            for i in reversed(range(0,361, 30)):
+                theta = i * pi/180.0
+
+                x = 1 * cos(theta) + point[0]
+                y = 1 * sin(theta) + point[1]
+                z = point[2]*-1.5
+
+                x0 = 1 * cos(theta) + point0[0]
+                y0 = 1 * sin(theta) + point0[1]
+                z0 = point0[2]*-1.5
+
+                glVertex3f(x0,y0,z0)
+                glVertex3f(x,y,z)
+
             glEnd()
-    
+            glPopMatrix()
+            point0 = point
+
+    def draw_circles(self):
+        for point in self.points:
+            glPushMatrix()
+            #TODO: Apply rotation matrix here to rotate tube section in the direction of point - point0
+            # i.e change the normal of the circle from (0,0,-1) (default) to point - point0 by applying a rotation
+            glBegin(GL_LINE_LOOP) 
+
+            # pick colour based on depth
+            red = ((point[2])%50)/50 # doesnt matter what we do here
+            blue = 1 - (((point[2])%50)/50) # doesnt matter what we do here
+            green = 0
+
+            glColor3f(red,green,blue)
+
+            # DRAW CIRCLE CONNECTING POINT FROM ONE CIRCLE TO THE OTHER
+            for i in reversed(range(0,361, 30)):
+                theta = i * pi/180.0
+
+                x = 0.5 * cos(theta) + point[0]
+                y = 0.5 * sin(theta) + point[1]
+                z = point[2]*-1.5
+                glVertex3f(x,y,z)
+
+            glEnd()
+            glPopMatrix()
+
+
+
     def draw_cube(self):
         glBegin(GL_QUADS)
         #glNormal3f( 0.0,  0.0, 1.0)
