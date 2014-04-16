@@ -408,6 +408,10 @@ static void onDeviceDisconnected(Context context, Context::DeviceRemovedData dat
     printf("Device disconnected\n");
 }
 
+/*----------------------------------------------------------------------------*/
+/*                         Data processors                                    */
+/*----------------------------------------------------------------------------*/
+
 extern "C" {
     static void killds(){
         if (child_pid == 0) {
@@ -523,6 +527,49 @@ static void initds()
     }
 
 }
+
+/*
+ * Using (assumed to be) up-to-date depth/uv/colour maps build a colour map
+ * with the resoloution of the depth map with pixels that exist in both the 
+ * depth and colour map exclusively (that info is provided by the uv map)
+ */
+static void buildSyncMap() {
+
+    int ci, cj;
+    uint8_t colx;
+    uint8_t coly;
+    uint8_t colz;
+    float uvx;
+    float uvy;
+
+    for(int i=0; i < dH; i++) {
+        for(int j=0; j < dW; j++) {
+            uvx = uvMapClone[i*dW*2 + j*2 + 0];    
+            uvy = uvMapClone[i*dW*2 + j*2 + 1];    
+            colx = 0;
+            coly = 0;
+            colz = 0;
+            
+            if((uvx > 0 && uvx < 1 && uvy > 0 && uvy < 1) && 
+                (depthMapClone[i*dW + j] < 32000)){
+                ci = (int) (uvy * ((float) cH));
+                cj = (int) (uvx * ((float) cW));
+                colx = colourMapClone[ci*cW*3 + cj*3 + 0];
+                coly = colourMapClone[ci*cW*3 + cj*3 + 1];
+                colz = colourMapClone[ci*cW*3 + cj*3 + 2];
+            }
+          
+            
+            syncMapClone[i*dW*3 + j*3 + 0] = colx;
+            syncMapClone[i*dW*3 + j*3 + 1] = coly;
+            syncMapClone[i*dW*3 + j*3 + 2] = colz;
+
+        }
+    }
+
+
+}
+
 /*----------------------------------------------------------------------------*/
 /*                       Python Callbacks                                     */
 /*----------------------------------------------------------------------------*/
@@ -572,38 +619,7 @@ static PyObject *getSync(PyObject *self, PyObject *args)
     memcpy(colourMapClone, colourFullMap, cshmsz*3);
     memcpy(depthMapClone, depthFullMap, dshmsz);
     
-    int ci, cj;
-    uint8_t colx;
-    uint8_t coly;
-    uint8_t colz;
-    float uvx;
-    float uvy;
-
-    for(int i=0; i < dH; i++) {
-        for(int j=0; j < dW; j++) {
-            uvx = uvMapClone[i*dW*2 + j*2 + 0];    
-            uvy = uvMapClone[i*dW*2 + j*2 + 1];    
-            colx = 0;
-            coly = 0;
-            colz = 0;
-            
-            if((uvx > 0 && uvx < 1 && uvy > 0 && uvy < 1) && 
-                (depthMapClone[i*dW + j] < 32000)){
-                ci = (int) (uvy * ((float) cH));
-                cj = (int) (uvx * ((float) cW));
-                colx = colourMapClone[ci*cW*3 + cj*3 + 0];
-                coly = colourMapClone[ci*cW*3 + cj*3 + 1];
-                colz = colourMapClone[ci*cW*3 + cj*3 + 2];
-            }
-          
-            
-            syncMapClone[i*dW*3 + j*3 + 0] = colx;
-            syncMapClone[i*dW*3 + j*3 + 1] = coly;
-            syncMapClone[i*dW*3 + j*3 + 2] = colz;
-
-        }
-    }
-
+    buildSyncMap();
     return PyArray_SimpleNewFromData(3, dims, NPY_UINT8, syncMapClone);
 }
 
