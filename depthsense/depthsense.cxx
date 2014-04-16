@@ -18,15 +18,15 @@
 // info@softkinetic.com Copyright (c) 2002-2012 Softkinetic Sensors NV
 ////////////////////////////////////////////////////////////////////////////////
 
+// Python Module includes
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#include <python2.7/Python.h>
+#include <python2.7/numpy/arrayobject.h>
 
+// MS completly untested
 #ifdef _MSC_VER
 #include <windows.h>
 #endif
-
-// Python Module includes
-#include <python2.7/Python.h>
-#include <python2.7/numpy/arrayobject.h>
 
 // C includes
 #include <stdio.h>
@@ -408,6 +408,14 @@ static void onDeviceDisconnected(Context context, Context::DeviceRemovedData dat
     printf("Device disconnected\n");
 }
 
+/*----------------------------------------------------------------------------*/
+/*                         Data processors                                    */
+/*----------------------------------------------------------------------------*/
+
+/* 
+ * the at exit call back. kill the depthsense node process as well as
+ * clean up the shared mem regions
+ */
 extern "C" {
     static void killds(){
         if (child_pid == 0) {
@@ -427,6 +435,11 @@ extern "C" {
     }
 }
 
+/* 
+ * init the shared mem regions and fork the depthsense "turn on nodes" code
+ * preparation for the two levels of async callbacks 
+ * (one two and from the nodes, the other two and from python method calls)
+ */
 static void initds()
 {
     // shared mem double buffers
@@ -523,6 +536,49 @@ static void initds()
     }
 
 }
+
+/*
+ * Using (assumed to be) up-to-date depth/uv/colour maps build a colour map
+ * with the resoloution of the depth map with pixels that exist in both the 
+ * depth and colour map exclusively (that info is provided by the uv map)
+ */
+static void buildSyncMap() {
+
+    int ci, cj;
+    uint8_t colx;
+    uint8_t coly;
+    uint8_t colz;
+    float uvx;
+    float uvy;
+
+    for(int i=0; i < dH; i++) {
+        for(int j=0; j < dW; j++) {
+            uvx = uvMapClone[i*dW*2 + j*2 + 0];    
+            uvy = uvMapClone[i*dW*2 + j*2 + 1];    
+            colx = 0;
+            coly = 0;
+            colz = 0;
+            
+            if((uvx > 0 && uvx < 1 && uvy > 0 && uvy < 1) && 
+                (depthMapClone[i*dW + j] < 32000)){
+                ci = (int) (uvy * ((float) cH));
+                cj = (int) (uvx * ((float) cW));
+                colx = colourMapClone[ci*cW*3 + cj*3 + 0];
+                coly = colourMapClone[ci*cW*3 + cj*3 + 1];
+                colz = colourMapClone[ci*cW*3 + cj*3 + 2];
+            }
+          
+            
+            syncMapClone[i*dW*3 + j*3 + 0] = colx;
+            syncMapClone[i*dW*3 + j*3 + 1] = coly;
+            syncMapClone[i*dW*3 + j*3 + 2] = colz;
+
+        }
+    }
+
+
+}
+
 /*----------------------------------------------------------------------------*/
 /*                       Python Callbacks                                     */
 /*----------------------------------------------------------------------------*/
@@ -572,38 +628,7 @@ static PyObject *getSync(PyObject *self, PyObject *args)
     memcpy(colourMapClone, colourFullMap, cshmsz*3);
     memcpy(depthMapClone, depthFullMap, dshmsz);
     
-    int ci, cj;
-    uint8_t colx;
-    uint8_t coly;
-    uint8_t colz;
-    float uvx;
-    float uvy;
-
-    for(int i=0; i < dH; i++) {
-        for(int j=0; j < dW; j++) {
-            uvx = uvMapClone[i*dW*2 + j*2 + 0];    
-            uvy = uvMapClone[i*dW*2 + j*2 + 1];    
-            colx = 0;
-            coly = 0;
-            colz = 0;
-            
-            if((uvx > 0 && uvx < 1 && uvy > 0 && uvy < 1) && 
-                (depthMapClone[i*dW + j] < 32000)){
-                ci = (int) (uvy * ((float) cH));
-                cj = (int) (uvx * ((float) cW));
-                colx = colourMapClone[ci*cW*3 + cj*3 + 0];
-                coly = colourMapClone[ci*cW*3 + cj*3 + 1];
-                colz = colourMapClone[ci*cW*3 + cj*3 + 2];
-            }
-          
-            
-            syncMapClone[i*dW*3 + j*3 + 0] = colx;
-            syncMapClone[i*dW*3 + j*3 + 1] = coly;
-            syncMapClone[i*dW*3 + j*3 + 2] = colz;
-
-        }
-    }
-
+    buildSyncMap();
     return PyArray_SimpleNewFromData(3, dims, NPY_UINT8, syncMapClone);
 }
 
@@ -620,15 +645,32 @@ static PyObject *killDepthS(PyObject *self, PyObject *args)
     return Py_None;
 }
 
+/* WORK IN PROGRESS!! */
+static PyObject *getBlob(PyObject *self, PyObject *args)
+{
+    int index;
+    double threshold;
+
+    if (!PyArg_ParseTuple(args, "id", &index, &threshold))
+        return NULL;
+
+    index = index + (int)threshold;
+    return Py_BuildValue("i", index);
+}
+
 static PyMethodDef DepthSenseMethods[] = {
+    // GET MAPS
     {"getDepthMap",  getDepth, METH_VARARGS, "Get Depth Map"},
     {"getColourMap",  getColour, METH_VARARGS, "Get Colour Map"},
     {"getVertices",  getVertex, METH_VARARGS, "Get Vertex Map"},
     {"getUVMap",  getUV, METH_VARARGS, "Get UV Map"},
     {"getSyncMap",  getSync, METH_VARARGS, "Get Colour Overlay Map"},
     {"getAcceleration",  getAccel, METH_VARARGS, "Get Acceleration"},
+    // CREATE MODULE
     {"initDepthSense",  initDepthS, METH_VARARGS, "Init DepthSense"},
     {"killDepthSense",  killDepthS, METH_VARARGS, "Kill DepthSense"},
+    // PROCESS MAPS
+    {"getBlobAt",  getBlob, METH_VARARGS, "Find blobs in the vertex map at index that are below a certain threshold"},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
