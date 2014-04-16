@@ -18,15 +18,15 @@
 // info@softkinetic.com Copyright (c) 2002-2012 Softkinetic Sensors NV
 ////////////////////////////////////////////////////////////////////////////////
 
+// Python Module includes
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#include <python2.7/Python.h>
+#include <python2.7/numpy/arrayobject.h>
 
+// MS completly untested
 #ifdef _MSC_VER
 #include <windows.h>
 #endif
-
-// Python Module includes
-#include <python2.7/Python.h>
-#include <python2.7/numpy/arrayobject.h>
 
 // C includes
 #include <stdio.h>
@@ -619,15 +619,31 @@ static PyObject *killDepthS(PyObject *self, PyObject *args)
     return Py_None;
 }
 
+static PyObject *getBlob(PyObject *self, PyObject *args)
+{
+    int index;
+    double threshold;
+
+    if (!PyArg_ParseTuple(args, "id", &index, &threshold))
+        return NULL;
+
+    index = index + (int)threshold;
+    return Py_BuildValue("i", index);
+}
+
 static PyMethodDef DepthSenseMethods[] = {
+    // GET MAPS
     {"getDepthMap",  getDepth, METH_VARARGS, "Get Depth Map"},
     {"getColourMap",  getColour, METH_VARARGS, "Get Colour Map"},
     {"getVertices",  getVertex, METH_VARARGS, "Get Vertex Map"},
     {"getUVMap",  getUV, METH_VARARGS, "Get UV Map"},
     {"getSyncMap",  getSync, METH_VARARGS, "Get Colour Overlay Map"},
     {"getAcceleration",  getAccel, METH_VARARGS, "Get Acceleration"},
+    // CREATE MODULE
     {"initDepthSense",  initDepthS, METH_VARARGS, "Init DepthSense"},
     {"killDepthSense",  killDepthS, METH_VARARGS, "Kill DepthSense"},
+    // PROCESS MAPS
+    {"getBlobAt",  getBlob, METH_VARARGS, "Find blobs in the vertex map at index that are below a certain threshold"},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 

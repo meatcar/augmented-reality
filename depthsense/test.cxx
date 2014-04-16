@@ -48,10 +48,16 @@ int main() {
         }
     }
 
-    int pack[3] = { 4, 11, matrix[4][11]};
+
+    int *pack = (int *)malloc(sizeof(int) * 3);
+    pack[0] = 4;
+    pack[1] = 11;
+    pack[2] = matrix[4][11];
+
     queue.push_back(pack);
     visited[4][11] = 1;
     result[4][11] = 2;
+
     while(!queue.empty()){
         int * val = queue.front();
         queue.pop_front();
@@ -108,6 +114,8 @@ int main() {
             result[p_i][p_j + 1] = v;
             visited[p_i][p_j + 1] = 1;
         }
+
+        free(val);
     }
 
     printf("----------\n");
@@ -130,31 +138,6 @@ int main() {
             printf(" ]\n");
         }
     }
-
-
-    printf("----------\n");
-    printf("[ ");
-    for(int i = 0; i < 20; i++) {
-        for(int j = 0; j < 30; j++) {
-            if (j == 0) {
-                printf("[ %d, ", visited[i][j]);
-            } else if (j != 29) {
-                printf("%d, ", visited[i][j]);
-            } else {
-                printf("%d]", visited[i][j]);
-            }
-            
-        }
-
-        if (i != 19) { 
-            printf("\n");
-        } else {
-            printf(" ]\n");
-        }
-    }
-
-
-
 
     printf("done\n");
     return 0;
