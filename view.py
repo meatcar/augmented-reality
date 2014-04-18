@@ -3,7 +3,7 @@ from OpenGL.GLUT import *
 from OpenGL.GLU import *
 from PIL import Image
 import numpy
-from math import sin,cos,tan,radians,pi,sqrt,atan,atan2,acos,asin,degrees
+from math import sin,cos,tan,radians,pi,sqrt,atan,atan2,acos,asin,degrees,copysign
 import sys
 
 import head
@@ -181,9 +181,9 @@ class View:
         glPushMatrix()
         self.draw_room()
         # rotate shape
-        glRotatef(self.shape.zangle, 0, 0, 1)
-        glRotatef(self.shape.yangle, 0, 1, 0)
-        glRotatef(self.shape.xangle, 1, 0, 0)
+        #glRotatef(self.shape.zangle, 0, 0, 1)
+        #glRotatef(self.shape.yangle, 0, 1, 0)
+        #glRotatef(self.shape.xangle, 1, 0, 0)
 
         #if self.shape is not None:
             #self.draw_shape()
@@ -275,9 +275,33 @@ class View:
             #print(sx/ns, sy/ns, sz/ns, distance)
 
             # store points with updated location (deals with the redrawing problem later)
-            self.points.append((self.head.x + point1[0]/100 - sx/ns*distance, self.head.y + point1[1]/100 - sy/ns*distance, point1[2]/100))
-            self.points.append((self.head.x + point2[0]/100 - sx/ns*distance, self.head.y + point2[1]/100 - sy/ns*distance, point2[2]/100))
+            
+            # the x and y points are strict additions of your head position, your fingers
+            # fingers position and your original origin away from the head (explained above)
+            # however, when spun 180 degrees, your directions need to be mirrored in the xz plane
+            # hence why the xz values are inverted based on which way your facing, forward/back
+            # this can be determined by the sign of sz
 
+            # y values are inverted, its very sketchy not gonna lie
+
+            # we dont add in the original origin for depth because it is irrelavant
+            
+
+            orient = copysign(1,sz) * -1
+
+            self.points.append(((self.head.x + point1[0]/100 + sx/ns*distance)*orient, 
+                                (self.head.y + point1[1]/-100 + sy/ns*distance), 
+                                (self.head.z + (point1[2]/100)*orient)*1))
+
+            self.points.append(((self.head.x + point2[0]/100 + sx/ns*distance)*orient, 
+                                (self.head.y + point2[1]/-100 + sy/ns*distance), 
+                                (self.head.z + (point2[2]/100)*orient)*1))
+
+
+            #print("x: ", self.head.x, point2[0]/100, sx/ns*distance )
+            #print("y: ", self.head.y, point2[1]/100, sy/ns*distance )
+            #print("z: ", self.head.z, point2[2]/100, sz/ns*distance, orient )
+    
 
         # bail if no points
         if len(self.points) < 2:
