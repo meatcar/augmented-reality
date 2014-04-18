@@ -284,8 +284,8 @@ class View:
             return
 
         # redraw all points (TODO: find way of just appending points instead of redrawing everything)
-        #self.draw_line()
-        self.draw_tube()
+        self.draw_line()
+        #self.draw_tube()
         #self.draw_circles()
 
     def draw_line(self):

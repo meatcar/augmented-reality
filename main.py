@@ -6,15 +6,16 @@ from handtracker import HandTracker
 #from controller import Controller
 from key_controller import KeyController
 from constants import Mode
+from os import kill
+import signal
 
 if __name__ == "__main__":
     head = Head()
     shape = Shape(height=0.4, width=0.4, x=0, y=0, z=-9)
     dots = Dots()
 
-    # Cube
     view = View(head=head, shape=shape, dots=dots, mode=Mode.KEY_MODE)
-
+    
     handtracker = HandTracker(dots)
     #controller = Controller(head, use_phidget=False, use_MPU=True)
     
@@ -24,6 +25,8 @@ if __name__ == "__main__":
     try:
         view.run()
     finally:
-        handtracker.proc.kill()
+        handtracker.shutdown()
+        kill(handtracker.proc.pid, signal.SIGINT)
+        handtracker.proc.wait()
         print("FINISHED");
 
