@@ -1,7 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <list>
 
+static int test[20][30];
 // SAMPLE
 using namespace std;
 int main() {
@@ -41,12 +43,15 @@ int main() {
     list<int *> queue;
     int visited[20][30];
     int result[20][30];
-    for(int i = 0; i < 20; i++) {
-        for(int j = 0; j < 30; j++) {
-            visited[i][j] = 0;
-            result[i][j] = 0;
-        }
-    }
+    memset(visited, 0, sizeof(visited));
+    memset(result, 0, sizeof(result));
+    printf("%d %d %d\n\n", sizeof(visited), sizeof(result), sizeof(test));
+    //for(int i = 0; i < 20; i++) {
+    //    for(int j = 0; j < 30; j++) {
+    //        visited[i][j] = 0;
+    //        result[i][j] = 0;
+    //    }
+    //}
 
 
     int *pack = (int *)malloc(sizeof(int) * 3);

@@ -533,8 +533,8 @@ static void initds()
  * with the resoloution of the depth map with pixels that exist in both the 
  * depth and colour map exclusively (that info is provided by the uv map)
  */
-static void buildSyncMap() {
-
+static void buildSyncMap()
+{
     int ci, cj;
     uint8_t colx;
     uint8_t coly;
@@ -567,6 +567,11 @@ static void buildSyncMap() {
         }
     }
 
+
+}
+
+static void findBlob(int sx, int sy, double thresh) 
+{
 
 }
 
