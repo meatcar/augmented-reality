@@ -146,6 +146,8 @@ class View:
         gluPerspective(self.head.fov, screen_ratio, 0.02, 1000)
 
         x_vec, y_vec, z_vec = self.get_direction()
+        # normalize the vector (will rescale with the distance we need to cover)
+        ns = sqrt(x_vec*x_vec + y_vec*y_vec + z_vec*z_vec)
         gluLookAt(
                 #                @ object
                 #    +--------+ /
@@ -159,9 +161,9 @@ class View:
                 self.head.y,
                 self.head.z + 1,
                 
-                x_vec*distance,
-                y_vec*distance,
-                z_vec*distance,
+                x_vec/ns*distance,
+                y_vec/ns*distance,
+                z_vec/ns*distance,
 
                 # the up vector in the final view.
                 0, 1, 0
@@ -180,6 +182,7 @@ class View:
         glMatrixMode(GL_MODELVIEW)
         glPushMatrix()
         self.draw_room()
+
         # rotate shape
         #glRotatef(self.shape.zangle, 0, 0, 1)
         #glRotatef(self.shape.yangle, 0, 1, 0)
@@ -238,7 +241,6 @@ class View:
             pass
 
 	# decide if two new points are useful
-        #print(point1, point2)
         point1, point2 = self.dots.get_last_two()
         if point1 and point2 and not \
             ((point1[0] > 62000 or point1[1] > 62000 or point1[2] > 62000) or \
@@ -278,29 +280,27 @@ class View:
             
             # the x and y points are strict additions of your head position, your fingers
             # fingers position and your original origin away from the head (explained above)
-            # however, when spun 180 degrees, your directions need to be mirrored in the xz plane
-            # hence why the xz values are inverted based on which way your facing, forward/back
-            # this can be determined by the sign of sz
 
             # y values are inverted, its very sketchy not gonna lie
-
-            # we dont add in the original origin for depth because it is irrelavant
+            # the x values need to be flipped when the plane is flipped 180 - 360 degrees
+            # the mystery behind the x value is still unsolved (must be the euler angles)
+            # we dont add in the original origin for z vals  because it is irrelavant
             
 
             orient = copysign(1,sz) * -1
 
-            self.points.append(((self.head.x + point1[0]/100 + sx/ns*distance)*orient, 
+            self.points.append(((self.head.x + point1[0]/100*orient + sx/ns*distance), 
                                 (self.head.y + point1[1]/-100 + sy/ns*distance), 
-                                (self.head.z + (point1[2]/100)*orient)*1))
+                                (self.head.z + (point1[2]/100)*orient)))
 
-            self.points.append(((self.head.x + point2[0]/100 + sx/ns*distance)*orient, 
+            self.points.append(((self.head.x + point2[0]/100*orient + sx/ns*distance), 
                                 (self.head.y + point2[1]/-100 + sy/ns*distance), 
-                                (self.head.z + (point2[2]/100)*orient)*1))
+                                (self.head.z + (point2[2]/100)*orient)))
 
 
-            #print("x: ", self.head.x, point2[0]/100, sx/ns*distance )
-            #print("y: ", self.head.y, point2[1]/100, sy/ns*distance )
-            #print("z: ", self.head.z, point2[2]/100, sz/ns*distance, orient )
+            #print("x: ", self.head.x, point2[0]/100, sx, sx/ns*distance, distance )
+            #print("y: ", self.head.y, point2[1]/100, sy, sy/ns*distance, distance )
+            #print("z: ", self.head.z, point2[2]/100, sz, sz/ns*distance, orient )
     
 
         # bail if no points
@@ -318,9 +318,12 @@ class View:
         for point in self.points[1:]:
 
             # pick colour based on depth
-            red = (1 - ((point0[2] + point[2])%50)/50)/4 # doesnt matter what we do here
-            blue = 1 - (((point0[2] + point[2])%50)/50) # doesnt matter what we do here
-            green = (1 -  ((point0[2] + point[2])%50)/50)/4 # doesnt matter what we do here
+            depth = (abs(point0[2] + point[2])%32)/32 # scales it from 0 - 1 approx
+
+            red = (1 - depth)/4 # doesnt matter what we do here
+            blue = 1 - depth # doesnt matter what we do here
+            green = (1 -  depth)/4 # doesnt matter what we do here
+
             glColor3f(red,green,blue)
 
             glVertex3f(point0[0] ,
@@ -345,22 +348,26 @@ class View:
 
             dir_vec = (point[0] - point0[0], point[1] - point0[1], point[2] - point0[2])
             dir_len = sqrt(dir_vec[0]*dir_vec[0] +  dir_vec[1]*dir_vec[1] +  dir_vec[2]*dir_vec[2]) 
+            # normalize dir_vec
+            dir_vec = (dir_vec[0]/dir_len, dir_vec[1]/dir_len, dir_vec[2]/dir_len) 
+        
             dir_theta = 0
             dir_phi = 0
             if not (any(dir_vec) == 0):
                 dir_theta = degrees(atan(dir_vec[1]/dir_vec[0]))
-                dir_phi = degrees(asin(dir_vec[2]/dir_len))
+                dir_phi = degrees(asin(dir_vec[2]))
 
-            print(dir_vec)
-            print(dir_theta - 0, dir_phi - 0)
+            print("dir: ", dir_vec, "angles: ", dir_theta, dir_phi)
             glRotatef(dir_theta, 1, 0, 0)
             glRotatef(dir_phi, 0, 1, 0)
 
             glBegin(GL_TRIANGLE_STRIP) 
 
             # pick colour based on depth
-            red = ((point0[2] + point[2])%50)/50 # doesnt matter what we do here
-            blue = 1 - (((point0[2] + point[2])%50)/50) # doesnt matter what we do here
+            depth = (abs(point0[2] + point[2])%32)/32 # scales it from 0 - 1 approx
+
+            red = depth # doesnt matter what we do here
+            blue = 1 - depth # doesnt matter what we do here
             green = 0
 
             glColor3f(red,green,blue)
@@ -387,13 +394,13 @@ class View:
     def draw_circles(self):
         for point in self.points:
             glPushMatrix()
-            #TODO: Apply rotation matrix here to rotate tube section in the direction of point - point0
-            # i.e change the normal of the circle from (0,0,-1) (default) to point - point0 by applying a rotation
             glBegin(GL_LINE_LOOP) 
 
             # pick colour based on depth
-            red = ((point[2])%50)/50 # doesnt matter what we do here
-            blue = 1 - (((point[2])%50)/50) # doesnt matter what we do here
+            depth = (abs(point0[2] + point[2])%32)/32 # scales it from 0 - 1 approx
+
+            red = 1 - depth # doesnt matter what we do here
+            blue = depth # doesnt matter what we do here
             green = 0
 
             glColor3f(red,green,blue)

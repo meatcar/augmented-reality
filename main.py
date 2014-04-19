@@ -14,7 +14,7 @@ if __name__ == "__main__":
     shape = Shape(height=0.4, width=0.4, x=0, y=0, z=-9)
     dots = Dots()
 
-    view = View(head=head, shape=shape, dots=dots, mode=Mode.KEY_MODE)
+    view = View(head=head, shape=shape, dots=dots, mode=Mode.MPU_MODE)
     
     handtracker = HandTracker(dots)
     #controller = Controller(head, use_phidget=False, use_MPU=True)
