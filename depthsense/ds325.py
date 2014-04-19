@@ -22,6 +22,18 @@ class DS325:
         iD = Image(depth.transpose())
         return iD.invert()
 
+
+    def getBlob(self, i, j, thresh):
+        ''' Return a simple cv compatiable 8bit depth image '''
+
+        blob = ds.getBlobAt(i,j, thresh)
+        np.clip(blob, 0, 2**10 - 1, blob)
+        blob >>=2
+        blob = blob.astype(np.uint8)
+        iB = Image(blob.transpose())
+        return iB.invert()
+
+
     def getDepthFull(self):
         ''' Return the pure 16bit depth map as a numpy array '''
 

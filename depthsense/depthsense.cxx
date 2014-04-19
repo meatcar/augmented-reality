@@ -28,6 +28,7 @@
 #include <windows.h>
 #endif
 
+
 // C includes
 #include <stdio.h>
 #include <sys/types.h>
@@ -35,11 +36,13 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
 
 // C++ includes
 #include <vector>
 #include <exception>
 #include <iostream>
+#include <list>
 //#include <thread>
 
 // DepthSense SDK includes
@@ -100,6 +103,13 @@ static int16_t vertexMapClone[320*240*3];
 static float accelMapClone[3];
 static float uvMapClone[320*240*2];
 static uint8_t syncMapClone[320*240*3];
+
+// internal maps for blob finding
+static uint16_t blobMap[320*240];
+static uint16_t result[320*240];
+static uint16_t resultClone[320*240];
+static uint8_t visited[320][240];
+// lazyness here, will undo
 
 int child_pid = 0;
 
@@ -570,8 +580,85 @@ static void buildSyncMap()
 
 }
 
-static void findBlob(int sx, int sy, double thresh) 
+static void findBlob(int sx, int sy, int thresh) 
 {
+
+    list<int *> queue;
+    memset(visited, 0, sizeof(visited));
+    memset(result, 255, sizeof(result));
+   
+
+    int *pack = (int *)malloc(sizeof(int) * 3);
+    pack[0] = sy;
+    pack[1] = sx;
+    pack[2] = (int) thresh;
+
+    //printf("%d %d %d\n", sizeof(visited), sizeof(result), thresh);
+
+
+    // may or may not to add this point? thresh could be independant of this guys val, maybe make it upper or lower bound?
+    queue.push_back(pack);
+    visited[sy][sx] = 1;
+    result[sy*dW + sx] = blobMap[sy*dW + sx];
+
+    while(!queue.empty()){
+        int * val = queue.front();
+        queue.pop_front();
+        int p_i = val[0];
+        int p_j = val[1];
+        //printf("START: val : %d %d %d\n", p_i, p_j, v);
+        // RIGHT
+        if ((p_i + 1) < dH && (visited[p_i + 1][p_j] == 0) && (blobMap[(p_i + 1)*dW + p_j] < thresh)) { 
+            //printf("val : %d %d %d PASS RIGHT\n", p_i + 1, p_j, thresh);
+            int *pack = (int *)malloc(sizeof(int) * 3);
+            pack[0] = p_i + 1;
+            pack[1] = p_j;
+            pack[2] = (int) blobMap[(p_i + 1)*dW + p_j];
+            queue.push_back(pack);
+            result[(p_i + 1)*dW + p_j] = blobMap[(p_i + 1)*dW + p_j];
+            visited[p_i + 1][p_j] = 1;
+        }
+
+        // LEFT
+        if ((p_i - 1) > 0 && (visited[p_i - 1][p_j] == 0) && (blobMap[(p_i - 1)*dW + p_j] < thresh)) { 
+            //printf("val : %d %d %d PASS LEFT\n", p_i - 1, p_j, v);
+            int *pack = (int *)malloc(sizeof(int) * 3);
+            pack[0] = p_i - 1;
+            pack[1] = p_j;
+            pack[2] = (int) blobMap[(p_i - 1)*dW + p_j]; 
+            queue.push_back(pack);
+            result[(p_i - 1)*dW + p_j] = blobMap[(p_i - 1)*dW + p_j];
+            visited[p_i - 1][p_j] = 1;
+        }
+
+        // UP
+        if ((p_j - 1) > 0 && (visited[p_i][p_j - 1] == 0) && (blobMap[(p_i)*dW + p_j - 1] < thresh)) { 
+            //printf("val : %d %d %d PASS UP\n", p_i, p_j - 1, v);
+            int *pack = (int *)malloc(sizeof(int) * 3);
+            pack[0] = p_i;
+            pack[1] = p_j - 1;
+            pack[2] = (int) blobMap[(p_i)*dW + p_j - 1];
+            queue.push_back(pack);
+
+            result[(p_i)*dW + p_j - 1] = blobMap[(p_i)*dW + p_j - 1];
+            visited[p_i][p_j - 1] = 1;
+        }
+
+        // DOWN
+        if ((p_j + 1) < dW && (visited[p_i][p_j + 1] == 0) && (blobMap[(p_i)*dW + p_j + 1] < thresh)) { 
+            //printf("val : %d %d %d PASS DOWN\n", p_i, p_j + 1, v);
+            int *pack = (int *)malloc(sizeof(int) * 3);
+            pack[0] = p_i;
+            pack[1] = p_j + 1;
+            pack[2] = (int) blobMap[(p_i)*dW + p_j + 1] ;
+            queue.push_back(pack);
+
+            result[(p_i)*dW + p_j + 1] = blobMap[(p_i)*dW + p_j + 1]; 
+            visited[p_i][p_j + 1] = 1;
+        }
+
+        free(val);
+    }
 
 }
 
@@ -643,14 +730,19 @@ static PyObject *killDepthS(PyObject *self, PyObject *args)
 
 static PyObject *getBlob(PyObject *self, PyObject *args)
 {
-    int index;
+    int i;
+    int j;
     double threshold;
 
-    if (!PyArg_ParseTuple(args, "id", &index, &threshold))
+    if (!PyArg_ParseTuple(args, "iid", &i, &j,  &threshold))
         return NULL;
 
-    index = index + (int)threshold;
-    return Py_BuildValue("i", index);
+    npy_intp dims[2] = {dH, dW};
+
+    memcpy(blobMap, depthFullMap, dshmsz);
+    findBlob(j, i, threshold); 
+    memcpy(resultClone, result, dshmsz);
+    return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, resultClone);
 }
 
 static PyMethodDef DepthSenseMethods[] = {

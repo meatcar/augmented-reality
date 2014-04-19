@@ -1,11 +1,10 @@
 #!/bin/python2
-
-import DepthSense as ds
-import numpy as np
+from ds325 import DS325
 from SimpleCV import *
-c = 0
-ds.initDepthSense()
+#c = 0
+depthsense = DS325()
 while True:
-    print ds.getBlobAt(c, 10) 
-    c+=1
+    iD = depthsense.getDepth() 
+    iB = depthsense.getBlob(100,100, 275)
 
+    iD.sideBySide(iB).show()
