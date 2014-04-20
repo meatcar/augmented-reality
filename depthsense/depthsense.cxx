@@ -576,84 +576,97 @@ static void buildSyncMap()
 
         }
     }
-
-
 }
 
-static void findBlob(int sx, int sy, int thresh) 
+/* 
+ * Blobs bitch
+ */
+static void findBlob(int sy, int sx, double thresh_high, double thresh_low) 
 {
 
     list<int *> queue;
     memset(visited, 0, sizeof(visited));
     memset(result, 255, sizeof(result));
    
+    int *pack = (int *)malloc(sizeof(int) * 2);
+    pack[0] = sy; pack[1] = sx;
 
-    int *pack = (int *)malloc(sizeof(int) * 3);
-    pack[0] = sy;
-    pack[1] = sx;
-    pack[2] = (int) thresh;
-
-    //printf("%d %d %d\n", sizeof(visited), sizeof(result), thresh);
-
-
-    // may or may not to add this point? thresh could be independant of this guys val, maybe make it upper or lower bound?
+    // assume it passes the threshold/base requirement, can return here possibly
     queue.push_back(pack);
     visited[sy][sx] = 1;
     result[sy*dW + sx] = blobMap[sy*dW + sx];
+    uint16_t base = blobMap[sy*dW + sx];
+    uint16_t depth;
 
     while(!queue.empty()){
         int * val = queue.front();
         queue.pop_front();
         int p_i = val[0];
         int p_j = val[1];
-        //printf("START: val : %d %d %d\n", p_i, p_j, v);
-        // RIGHT
-        if ((p_i + 1) < dH && (visited[p_i + 1][p_j] == 0) && (blobMap[(p_i + 1)*dW + p_j] < thresh)) { 
-            //printf("val : %d %d %d PASS RIGHT\n", p_i + 1, p_j, thresh);
-            int *pack = (int *)malloc(sizeof(int) * 3);
-            pack[0] = p_i + 1;
-            pack[1] = p_j;
-            pack[2] = (int) blobMap[(p_i + 1)*dW + p_j];
-            queue.push_back(pack);
-            result[(p_i + 1)*dW + p_j] = blobMap[(p_i + 1)*dW + p_j];
+
+        // DOWN
+        if ((p_i + 1 < dH) && (visited[p_i + 1][p_j] == 0)) {
+
+            depth = blobMap[(p_i + 1)*dW + p_j];
+            if ((depth < thresh_high + base) &&
+                (depth > base - thresh_low)) {
+                int *pack = (int *)malloc(sizeof(int) * 2);
+                pack[0] = p_i + 1; pack[1] = p_j;
+
+                queue.push_back(pack);
+                result[(p_i + 1)*dW + p_j] = depth;
+            }
+
             visited[p_i + 1][p_j] = 1;
         }
 
-        // LEFT
-        if ((p_i - 1) > 0 && (visited[p_i - 1][p_j] == 0) && (blobMap[(p_i - 1)*dW + p_j] < thresh)) { 
-            //printf("val : %d %d %d PASS LEFT\n", p_i - 1, p_j, v);
-            int *pack = (int *)malloc(sizeof(int) * 3);
-            pack[0] = p_i - 1;
-            pack[1] = p_j;
-            pack[2] = (int) blobMap[(p_i - 1)*dW + p_j]; 
-            queue.push_back(pack);
-            result[(p_i - 1)*dW + p_j] = blobMap[(p_i - 1)*dW + p_j];
+
+        // UP
+        if ((p_i - 1 > 0) && (visited[p_i - 1][p_j] == 0)) {
+
+            depth = blobMap[(p_i - 1)*dW + p_j];
+            if ((depth < thresh_high + base) &&
+                (depth > base - thresh_low)) {
+                int *pack = (int *)malloc(sizeof(int) * 2);
+                pack[0] = p_i - 1; pack[1] = p_j;
+
+                queue.push_back(pack);
+                result[(p_i - 1)*dW + p_j] = depth;
+            }
+
             visited[p_i - 1][p_j] = 1;
         }
 
-        // UP
-        if ((p_j - 1) > 0 && (visited[p_i][p_j - 1] == 0) && (blobMap[(p_i)*dW + p_j - 1] < thresh)) { 
-            //printf("val : %d %d %d PASS UP\n", p_i, p_j - 1, v);
-            int *pack = (int *)malloc(sizeof(int) * 3);
-            pack[0] = p_i;
-            pack[1] = p_j - 1;
-            pack[2] = (int) blobMap[(p_i)*dW + p_j - 1];
-            queue.push_back(pack);
+        // LEFT
+        if ((p_j - 1 > 0) && (visited[p_i][p_j - 1] == 0)) {
 
-            result[(p_i)*dW + p_j - 1] = blobMap[(p_i)*dW + p_j - 1];
+            depth = blobMap[(p_i)*dW + p_j - 1];
+            if ((depth < thresh_high + base) &&
+                (depth > base - thresh_low)) {
+                int *pack = (int *)malloc(sizeof(int) * 2);
+                pack[0] = p_i; pack[1] = p_j - 1;
+
+                queue.push_back(pack);
+                result[(p_i)*dW + p_j - 1] = depth;
+            }
+
             visited[p_i][p_j - 1] = 1;
-        }
+       }
 
-        // DOWN
-        if ((p_j + 1) < dW && (visited[p_i][p_j + 1] == 0) && (blobMap[(p_i)*dW + p_j + 1] < thresh)) { 
-            //printf("val : %d %d %d PASS DOWN\n", p_i, p_j + 1, v);
-            int *pack = (int *)malloc(sizeof(int) * 3);
-            pack[0] = p_i;
-            pack[1] = p_j + 1;
-            pack[2] = (int) blobMap[(p_i)*dW + p_j + 1] ;
-            queue.push_back(pack);
+        // RIGHT
+        if ((p_j + 1 < dW) && (visited[p_i][p_j + 1] == 0)) {
 
-            result[(p_i)*dW + p_j + 1] = blobMap[(p_i)*dW + p_j + 1]; 
+            depth = blobMap[(p_i)*dW + p_j + 1];
+            if ((depth < thresh_high + base) &&
+                (depth > base - thresh_low)) {
+                int *pack = (int *)malloc(sizeof(int) * 2);
+                pack[0] = p_i; pack[1] = p_j + 1;
+
+
+                queue.push_back(pack);
+                result[(p_i)*dW + p_j + 1] = depth;
+            }
+
             visited[p_i][p_j + 1] = 1;
         }
 
@@ -732,15 +745,16 @@ static PyObject *getBlob(PyObject *self, PyObject *args)
 {
     int i;
     int j;
-    double threshold;
+    double thresh_high;
+    double thresh_low;
 
-    if (!PyArg_ParseTuple(args, "iid", &i, &j,  &threshold))
+    if (!PyArg_ParseTuple(args, "iidd", &i, &j,  &thresh_high, &thresh_low))
         return NULL;
 
     npy_intp dims[2] = {dH, dW};
 
     memcpy(blobMap, depthFullMap, dshmsz);
-    findBlob(j, i, threshold); 
+    findBlob(i, j, thresh_high, thresh_low); 
     memcpy(resultClone, result, dshmsz);
     return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, resultClone);
 }
@@ -757,7 +771,7 @@ static PyMethodDef DepthSenseMethods[] = {
     {"initDepthSense",  initDepthS, METH_VARARGS, "Init DepthSense"},
     {"killDepthSense",  killDepthS, METH_VARARGS, "Kill DepthSense"},
     // PROCESS MAPS
-    {"getBlobAt",  getBlob, METH_VARARGS, "Find blobs in the vertex map at index that are below a certain threshold"},
+    {"getBlobAt",  getBlob, METH_VARARGS, "Find blobs in the depth map at index that are a threshold below and above the value at that index"},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 

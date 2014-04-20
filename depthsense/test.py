@@ -5,6 +5,6 @@ from SimpleCV import *
 depthsense = DS325()
 while True:
     iD = depthsense.getDepth() 
-    iB = depthsense.getBlob(100,100, 275)
+    iB = depthsense.getBlob(100,100, 50, 200)
 
     iD.sideBySide(iB).show()

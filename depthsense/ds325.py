@@ -23,10 +23,13 @@ class DS325:
         return iD.invert()
 
 
-    def getBlob(self, i, j, thresh):
-        ''' Return a simple cv compatiable 8bit depth image '''
+    def getBlob(self, i, j, thresh_high, thresh_low):
+        ''' Return a simple cv compatiable 8bit depth image that contains only 
+        the blob found at index i,j with depth values that are at most 
+        +thresh_high or at least -thresh_low relative to the depth value at 
+        i, j'''
 
-        blob = ds.getBlobAt(i,j, thresh)
+        blob = ds.getBlobAt(i,j, thresh_high, thresh_low)
         np.clip(blob, 0, 2**10 - 1, blob)
         blob >>=2
         blob = blob.astype(np.uint8)
