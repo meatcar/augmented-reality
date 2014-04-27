@@ -106,9 +106,25 @@ static uint8_t syncMapClone[320*240*3];
 
 // internal maps for blob finding
 static uint16_t blobMap[320*240];
-static uint16_t result[320*240];
-static uint16_t resultClone[320*240];
+static uint16_t blobResult[320*240];
+static uint16_t blobResultClone[320*240];
 static uint8_t visited[320][240];
+
+// internal maps for edge finding
+static uint16_t edgeMap[320*240];
+static uint16_t edgeResult[320*240];
+static uint16_t edgeResultClone[320*240];
+static int edgeKern[3][3] = { { 0,  1,  0}, 
+                              { 1, -4,  1}, 
+                              { 0,  1,  0} };
+
+static int sharpKern[3][3] = { {  0, -1,  0}, 
+                               { -1,  5, -1}, 
+                               {  0, -1,  0} };
+
+static int ogKern[3][3] = { { 0, 0, 0}, 
+                            { 0, 1, 0}, 
+                            { 0, 0, 0} };
 // lazyness here, will undo
 
 int child_pid = 0;
@@ -586,7 +602,7 @@ static bool checkHood(int p_i, int p_j, int base, double thresh_high, double thr
     
     if (visited[p_i][p_j] > 3) {
         // natta 
-        result[p_i*dW + p_j] = depth;
+        //blobResult[p_i*dW + p_j] = depth;
     } else if (visited[p_i][p_j] > 2) {
         // include the value since the neighbours all match
         // not sure if i should explore but ...
@@ -594,14 +610,24 @@ static bool checkHood(int p_i, int p_j, int base, double thresh_high, double thr
             (depth > base - thresh_low))) {
             pack[0] = p_i; pack[1] = p_j; pack[2] = base;
             push_val = true;
-            //result[p_i*dW + p_j] = depth;
+            blobResult[p_i*dW + p_j] = depth;
+            // fill in
+            //if ((p_i - 1 > 0) && (p_i + 1 < dH) && 
+            //    (p_j - 1 > 0) && (p_j + 1 < dW) &&
+            //    (blobResult[(p_i-1)*dW + p_j] > 0) && 
+            //    (blobResult[(p_i+1)*dW + p_j] > 0) && 
+            //    (blobResult[p_i*dW + (p_j-1)] > 0) && 
+            //    (blobResult[p_i*dW + (p_j+1)] > 0)) { 
+
+            //    blobResult[p_i*dW + p_j] = depth;
+            //}
         }
     } else if (visited[p_i][p_j] > 0) {
         if ((depth < thresh_high + base) &&
             (depth > base - thresh_low)) {
             pack[0] = p_i; pack[1] = p_j; pack[2] = depth;
             push_val = true;
-            //result[p_i*dW + p_j] = depth;
+            blobResult[p_i*dW + p_j] = depth;
         }
 
     // init
@@ -625,7 +651,7 @@ static void findBlob(int sy, int sx, double thresh_high, double thresh_low)
 
     list<int *> queue;
     memset(visited, 0, sizeof(visited));
-    memset(result, 255, sizeof(result));
+    memset(blobResult, 32002, sizeof(blobResult));
    
     int *pack = (int *)malloc(sizeof(int) * 3);
     pack[0] = sy; pack[1] = sx; pack[2] = blobMap[sy*dW + sx];
@@ -633,7 +659,7 @@ static void findBlob(int sy, int sx, double thresh_high, double thresh_low)
     // assume it passes the threshold/base requirement, can return here possibly
     queue.push_back(pack);
     visited[sy][sx] = 1;
-    result[sy*dW + sx] = blobMap[sy*dW + sx];
+    blobResult[sy*dW + sx] = blobMap[sy*dW + sx];
 
     while(!queue.empty()){
         int * val = queue.front();
@@ -692,6 +718,44 @@ static void findBlob(int sy, int sx, double thresh_high, double thresh_low)
 
 }
 
+static int convolve(int i, int j, int kern[3][3]) {
+    int edge = 0;
+    edge = edge + kern[1][1] * edgeMap[i*dW + j];
+    // UP AND DOWN
+    if (i - 1 > 0)
+        edge = edge + kern[0][1] * edgeMap[(i-1)*dW + j];
+    else
+        edge = edge + kern[0][1] * edgeMap[(i-0)*dW + j]; // extend
+
+    if (i + 1 < dH)
+        edge = edge + kern[2][1] * edgeMap[(i+1)*dW + j];
+    else
+        edge = edge + kern[2][1] * edgeMap[(i+0)*dW + j]; // extend
+
+    // LEFT AND RIGHT
+    if (j - 1 > 0)
+        edge = edge + kern[1][0] * edgeMap[i*dW + (j-1)]; 
+    else                      
+        edge = edge + kern[1][0] * edgeMap[i*dW + (j-0)]; // extend
+
+    if (j + 1 < dW)           
+        edge = edge + kern[1][2] * edgeMap[i*dW + (j+1)]; 
+    else                     
+        edge = edge + kern[1][2] * edgeMap[i*dW + (j+0)]; // extend
+    
+    return edge;
+
+}
+
+static void findEdges() 
+{
+    memset(edgeResult, 32002, sizeof(edgeResult));
+    for(int i=0; i < dH; i++) {
+        for(int j=0; j < dW; j++) {
+            edgeResult[i*dW + j] = convolve(i,j, sharpKern);
+        }
+    }
+}
 /*----------------------------------------------------------------------------*/
 /*                       Python Callbacks                                     */
 /*----------------------------------------------------------------------------*/
@@ -772,8 +836,17 @@ static PyObject *getBlob(PyObject *self, PyObject *args)
 
     memcpy(blobMap, depthFullMap, dshmsz);
     findBlob(i, j, thresh_high, thresh_low); 
-    memcpy(resultClone, result, dshmsz);
-    return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, resultClone);
+    memcpy(blobResultClone, blobResult, dshmsz);
+    return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, blobResultClone);
+}
+
+static PyObject *getEdges(PyObject *self, PyObject *args)
+{
+    npy_intp dims[2] = {dH, dW};
+    memcpy(edgeMap, depthFullMap, dshmsz);
+    findEdges(); 
+    memcpy(edgeResultClone, edgeResult, dshmsz);
+    return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, edgeResultClone);
 }
 
 static PyMethodDef DepthSenseMethods[] = {
@@ -788,7 +861,8 @@ static PyMethodDef DepthSenseMethods[] = {
     {"initDepthSense",  initDepthS, METH_VARARGS, "Init DepthSense"},
     {"killDepthSense",  killDepthS, METH_VARARGS, "Kill DepthSense"},
     // PROCESS MAPS
-    {"getBlobAt",  getBlob, METH_VARARGS, "Find blobs in the depth map at index that are a threshold below and above the value at that index"},
+    {"getBlobAt",  getBlob, METH_VARARGS, "Find blob at location in the depth map"},
+    {"getEdges",  getEdges, METH_VARARGS, "Find edges in depth map"},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 

@@ -6,5 +6,6 @@ depthsense = DS325()
 while True:
     iD = depthsense.getDepth() 
     iB = depthsense.getBlob(100,100, 5, 5)
+    iE = depthsense.getEdges()
 
-    iD.sideBySide(iB).show()
+    iD.sideBySide(iE).show()
