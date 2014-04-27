@@ -588,86 +588,176 @@ static void findBlob(int sy, int sx, double thresh_high, double thresh_low)
     memset(visited, 0, sizeof(visited));
     memset(result, 255, sizeof(result));
    
-    int *pack = (int *)malloc(sizeof(int) * 2);
-    pack[0] = sy; pack[1] = sx;
+    int *pack = (int *)malloc(sizeof(int) * 3);
+    pack[0] = sy; pack[1] = sx; pack[2] = blobMap[sy*dW + sx];
 
     // assume it passes the threshold/base requirement, can return here possibly
     queue.push_back(pack);
     visited[sy][sx] = 1;
     result[sy*dW + sx] = blobMap[sy*dW + sx];
-    uint16_t base = blobMap[sy*dW + sx];
-    uint16_t depth;
+    int depth;
 
     while(!queue.empty()){
         int * val = queue.front();
         queue.pop_front();
         int p_i = val[0];
         int p_j = val[1];
+        int base = val[2];
 
         // DOWN
-        if ((p_i + 1 < dH) && (visited[p_i + 1][p_j] == 0)) {
-
+        if (p_i + 1 < dH) {
             depth = blobMap[(p_i + 1)*dW + p_j];
-            if ((depth < thresh_high + base) &&
-                (depth > base - thresh_low)) {
-                int *pack = (int *)malloc(sizeof(int) * 2);
-                pack[0] = p_i + 1; pack[1] = p_j;
 
-                queue.push_back(pack);
+            if (visited[p_i + 1][p_j] > 3) {
+                // natta 
                 result[(p_i + 1)*dW + p_j] = depth;
+            } else if (visited[p_i + 1][p_j] > 2) {
+                // include the value since the neighbours all match
+                result[(p_i + 1)*dW + p_j] = depth;
+                // not sure if i should explore but ...
+                if (!((depth < thresh_high + base) &&
+                    (depth > base - thresh_low))) {
+                    int *pack = (int *)malloc(sizeof(int) * 3);
+                    pack[0] = p_i + 1; pack[1] = p_j; pack[2] = base;
+                    queue.push_back(pack);
+                }
+            } else if (visited[p_i + 1][p_j] > 0) {
+                if ((depth < thresh_high + base) &&
+                    (depth > base - thresh_low)) {
+                    int *pack = (int *)malloc(sizeof(int) * 3);
+                    pack[0] = p_i + 1; pack[1] = p_j; pack[2] = depth;
+
+                    queue.push_back(pack);
+                    result[(p_i + 1)*dW + p_j] = depth;
+                }
+
+            // init
+            } else if (visited[p_i + 1][p_j] == 0) {
+                if ((depth < thresh_high + base) &&
+                    (depth > base - thresh_low)) {
+                    int *pack = (int *)malloc(sizeof(int) * 3);
+                    pack[0] = p_i + 1; pack[1] = p_j; pack[2] = depth;
+
+                    queue.push_back(pack);
+                    result[(p_i + 1)*dW + p_j] = depth;
+                }
             }
 
-            visited[p_i + 1][p_j] = 1;
+            visited[p_i + 1][p_j]++;
         }
 
 
         // UP
-        if ((p_i - 1 > 0) && (visited[p_i - 1][p_j] == 0)) {
-
+        if (p_i - 1 > 0) {
             depth = blobMap[(p_i - 1)*dW + p_j];
-            if ((depth < thresh_high + base) &&
-                (depth > base - thresh_low)) {
-                int *pack = (int *)malloc(sizeof(int) * 2);
-                pack[0] = p_i - 1; pack[1] = p_j;
-
-                queue.push_back(pack);
+            if (visited[p_i - 1][p_j] > 3) {
+                // natta
                 result[(p_i - 1)*dW + p_j] = depth;
+            } else if (visited[p_i - 1][p_j] > 2) {
+                // include the value since the neighbours all match
+                result[(p_i - 1)*dW + p_j] = depth;
+                // explore?
+                if (!((depth < thresh_high + base) &&
+                    (depth > base - thresh_low))) {
+                    int *pack = (int *)malloc(sizeof(int) * 3);
+                    pack[0] = p_i - 1; pack[1] = p_j; pack[2] = base;
+                    queue.push_back(pack);
+                }
+            } else if (visited[p_i - 1][p_j] > 0) {
+                if ((depth < thresh_high + base) &&
+                    (depth > base - thresh_low)) {
+                    int *pack = (int *)malloc(sizeof(int) * 3);
+                    pack[0] = p_i - 1; pack[1] = p_j; pack[2] = depth;
+
+                    queue.push_back(pack);
+                    result[(p_i - 1)*dW + p_j] = depth;
+                }
+            // init
+            } else if (visited[p_i - 1][p_j] == 0) {
+                if ((depth < thresh_high + base) &&
+                    (depth > base - thresh_low)) {
+                    int *pack = (int *)malloc(sizeof(int) * 3);
+                    pack[0] = p_i - 1; pack[1] = p_j; pack[2] = depth;
+                    queue.push_back(pack);
+                }
             }
 
-            visited[p_i - 1][p_j] = 1;
+            visited[p_i - 1][p_j]++;
         }
 
         // LEFT
-        if ((p_j - 1 > 0) && (visited[p_i][p_j - 1] == 0)) {
-
+        if (p_j - 1 > 0) {
             depth = blobMap[(p_i)*dW + p_j - 1];
-            if ((depth < thresh_high + base) &&
-                (depth > base - thresh_low)) {
-                int *pack = (int *)malloc(sizeof(int) * 2);
-                pack[0] = p_i; pack[1] = p_j - 1;
-
-                queue.push_back(pack);
+            if (visited[p_i][p_j - 1] > 3) {
+                //natta
                 result[(p_i)*dW + p_j - 1] = depth;
+            } else if (visited[p_i][p_j - 1] > 2) {
+                result[(p_i)*dW + p_j - 1] = depth;
+                // explore?
+                if (!((depth < thresh_high + base) &&
+                    (depth > base - thresh_low))) {
+                    int *pack = (int *)malloc(sizeof(int) * 3);
+                    pack[0] = p_i; pack[1] = p_j - 1; pack[2] = base;
+                    queue.push_back(pack);
+                }
+            } else if (visited[p_i][p_j - 1] > 0) {
+                if ((depth < thresh_high + base) &&
+                    (depth > base - thresh_low)) {
+                    int *pack = (int *)malloc(sizeof(int) * 3);
+                    pack[0] = p_i; pack[1] = p_j - 1; pack[2] = depth;
+
+                    queue.push_back(pack);
+                    result[(p_i)*dW + p_j - 1] = depth;
+                }
+
+            // init
+            } else if (visited[p_i][p_j - 1] == 0) {
+                if ((depth < thresh_high + base) &&
+                    (depth > base - thresh_low)) {
+                    int *pack = (int *)malloc(sizeof(int) * 3);
+                    pack[0] = p_i; pack[1] = p_j - 1; pack[2] = depth;
+                    queue.push_back(pack);
+                }
             }
 
-            visited[p_i][p_j - 1] = 1;
+            visited[p_i][p_j - 1]++;
        }
 
         // RIGHT
-        if ((p_j + 1 < dW) && (visited[p_i][p_j + 1] == 0)) {
-
+        if (p_j + 1 < dW) {
             depth = blobMap[(p_i)*dW + p_j + 1];
-            if ((depth < thresh_high + base) &&
-                (depth > base - thresh_low)) {
-                int *pack = (int *)malloc(sizeof(int) * 2);
-                pack[0] = p_i; pack[1] = p_j + 1;
+            if (visited[p_i][p_j + 1] > 3) {
+                // natta
+                result[(p_i)*dW + p_j + 1] = depth; 
+            } else if (visited[p_i][p_j + 1] > 2) {
+                result[(p_i)*dW + p_j + 1] = depth; 
+                // explore?
+                if ((depth < thresh_high + base) &&
+                    (depth > base - thresh_low)) {
+                    int *pack = (int *)malloc(sizeof(int) * 3);
+                    pack[0] = p_i; pack[1] = p_j + 1; pack[2] = base;
+                    queue.push_back(pack);
+                }
+            } else if (visited[p_i][p_j + 1] > 0) {
+                if ((depth < thresh_high + base) &&
+                    (depth > base - thresh_low)) {
+                    int *pack = (int *)malloc(sizeof(int) * 3);
+                    pack[0] = p_i; pack[1] = p_j + 1; pack[2] = depth;
 
-
-                queue.push_back(pack);
-                result[(p_i)*dW + p_j + 1] = depth;
+                    queue.push_back(pack);
+                    result[(p_i)*dW + p_j + 1] = depth;                 
+                }
+            // init
+            } else if (visited[p_i][p_j + 1] == 0) {
+                if ((depth < thresh_high + base) &&
+                    (depth > base - thresh_low)) {
+                    int *pack = (int *)malloc(sizeof(int) * 3);
+                    pack[0] = p_i; pack[1] = p_j + 1; pack[2] = depth;
+                    queue.push_back(pack);
+                }
             }
 
-            visited[p_i][p_j + 1] = 1;
+            visited[p_i][p_j + 1]++;
         }
 
         free(val);
