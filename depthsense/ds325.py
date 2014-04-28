@@ -37,25 +37,33 @@ class DS325:
         return iB.invert()
 
 
-    def getEdges(self):
+    def getEdges(self, kern):
         ''' Return a simple cv compatiable 8bit depth image that contains only 
         the blob found at index i,j with depth values that are at most 
         +thresh_high or at least -thresh_low relative to the depth value at 
         i, j'''
 
-        edge = ds.getEdges()
-        #np.clip(edge, 0, 2**10 - 1, edge)
+        edge = ds.getEdges(kern)
+        np.clip(edge, 0, 2**10 - 1, edge)
         #edge >>=2
-        #edge = edge.astype(np.uint8)
+        edge = edge.astype(np.uint8)
         iE = Image(edge.transpose())
-        return iE
-
+        return iE.invert()
 
 
     def getDepthFull(self):
         ''' Return the pure 16bit depth map as a numpy array '''
+         
+        depth = ds.getDepthMap()
+        iD = Image(depth.transpose())
+        return iD
 
-        return ds.getDepthMap()
+    def getEdgesFull(self, kern):
+        ''' Return a pure numpy array of highlighted edges in the depthmap ''' 
+
+        edge = ds.getEdges(kern)
+        iE = Image(edge.transpose())
+        return iE
 
     def getVertex(self):
         ''' Return a vertex map for points in the depth map as a numpy array'''

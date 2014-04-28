@@ -129,7 +129,27 @@ static int ogKern[3][3] = { { 0, 0, 0},
                             { 0, 1, 0}, 
                             { 0, 0, 0} };
 
-static map<char*, int[3][3]> kernels;
+static int embossKern[3][3] = { { -2, -1,  0}, 
+                                { -1,  1,  1}, 
+                                {  0,  1,  2} };
+
+static int edgeHighKern[3][3] = { { -1, -1, -1}, 
+                                  { -1,  8, -1}, 
+                                  { -1, -1, -1} };
+
+static int blurKern[3][3] = { { 1,  2,  1},  // needs to be handled differently
+                              { 2,  4,  2}, 
+                              { 1,  2,  1} };
+
+static int sobelYKern[3][3] = { { 1, 0, -1}, 
+                                { 2, 0, -2}, 
+                                { 1, 0, -1} };
+
+static int sobelXKern[3][3] = { { -1, 0, 1}, 
+                                { -2, 0, 2}, 
+                                { -1, 0, 1} };
+
+static map<char*, int(*const)[3]> kernels;
 
 // clean up
 int child_pid = 0;
@@ -489,6 +509,16 @@ static void initds()
     uvMap = (float *) initmap(ushmsz*2); 
     uvFullMap = (float *) initmap(ushmsz*2); 
 
+    // kerns
+    kernels.insert(make_pair((char*)"edge", edgeKern));
+    kernels.insert(make_pair((char*)"sharp", sharpKern));
+    kernels.insert(make_pair((char*)"identity", ogKern));
+    kernels.insert(make_pair((char*)"blur", blurKern));
+    kernels.insert(make_pair((char*)"sobelX", sobelXKern));
+    kernels.insert(make_pair((char*)"sobelY", sobelYKern));
+    kernels.insert(make_pair((char*)"emboss", embossKern));
+    kernels.insert(make_pair((char*)"edgeH", edgeHighKern));
+    
     child_pid = fork();
     // child goes into loop
     if (child_pid == 0) {
@@ -585,16 +615,6 @@ static bool checkHood(int p_i, int p_j, int base, double thresh_high, double thr
             pack[0] = p_i; pack[1] = p_j; pack[2] = base;
             push_val = true;
             blobResult[p_i*dW + p_j] = depth;
-            // fill in
-            //if ((p_i - 1 > 0) && (p_i + 1 < dH) && 
-            //    (p_j - 1 > 0) && (p_j + 1 < dW) &&
-            //    (blobResult[(p_i-1)*dW + p_j] > 0) && 
-            //    (blobResult[(p_i+1)*dW + p_j] > 0) && 
-            //    (blobResult[p_i*dW + (p_j-1)] > 0) && 
-            //    (blobResult[p_i*dW + (p_j+1)] > 0)) { 
-
-            //    blobResult[p_i*dW + p_j] = depth;
-            //}
         }
     } else if (visited[p_i][p_j] > 0) {
         if ((depth < thresh_high + base) &&
@@ -645,10 +665,8 @@ static void findBlob(int sy, int sx, double thresh_high, double thresh_low)
         // DOWN
         if (p_i + 1 < dH) {
             int *dpack = (int *)malloc(sizeof(int) * 3);
-            if (checkHood(p_i + 1, p_j, p_v, thresh_high, thresh_low, dpack))
-                queue.push_back(dpack);
-            else
-                free(dpack);
+            checkHood(p_i + 1, p_j, p_v, thresh_high, thresh_low, dpack) ?
+                queue.push_back(dpack) : free(dpack);
 
             visited[p_i + 1][p_j]++;
         }
@@ -657,10 +675,8 @@ static void findBlob(int sy, int sx, double thresh_high, double thresh_low)
         // UP
         if (p_i - 1 > 0) {
             int *upack = (int *)malloc(sizeof(int) * 3);
-            if (checkHood(p_i - 1, p_j, p_v, thresh_high, thresh_low, upack))
-                queue.push_back(upack);
-            else 
-                free(upack);
+            checkHood(p_i - 1, p_j, p_v, thresh_high, thresh_low, upack) ?
+                queue.push_back(upack) : free(upack);
 
             visited[p_i - 1][p_j]++;
         }
@@ -668,10 +684,8 @@ static void findBlob(int sy, int sx, double thresh_high, double thresh_low)
         // LEFT
         if (p_j - 1 > 0) {
             int *lpack = (int *)malloc(sizeof(int) * 3);
-            if (checkHood(p_i, p_j - 1, p_v, thresh_high, thresh_low, lpack))
-                queue.push_back(lpack);
-            else
-                free(lpack);
+            checkHood(p_i, p_j - 1, p_v, thresh_high, thresh_low, lpack) ?
+                queue.push_back(lpack) : free(lpack);
             
             visited[p_i][p_j - 1]++;
        }
@@ -679,10 +693,8 @@ static void findBlob(int sy, int sx, double thresh_high, double thresh_low)
         // RIGHT
         if (p_j + 1 < dW) {
             int *rpack = (int *)malloc(sizeof(int) * 3);
-            if (checkHood(p_i, p_j + 1, p_v, thresh_high, thresh_low, rpack))
-                queue.push_back(rpack);
-            else
-                free(rpack);
+            checkHood(p_i, p_j + 1, p_v, thresh_high, thresh_low, rpack) ? 
+                queue.push_back(rpack) : free(rpack);
             
             visited[p_i][p_j + 1]++;
         }
@@ -717,16 +729,47 @@ static int convolve(int i, int j, int kern[3][3]) {
     else                     
         edge = edge + kern[1][2] * (int)edgeMap[i*dW + (j+0)]; // extend
     
+    // UP LEFT AND UP RIGHT
+    if ((j - 1 > 0) && (i - 1) > 0)
+        edge = edge + kern[0][0] * (int)edgeMap[(i-1)*dW + (j-1)]; 
+    else                      
+        edge = edge + kern[0][0] * (int)edgeMap[(i-0)*dW + (j-0)]; // extend
+
+    if ((j + 1 < dW) && (i - 1) > 0)
+        edge = edge + kern[0][2] * (int)edgeMap[(i-1)*dW + (j+1)]; 
+    else                     
+        edge = edge + kern[0][2] * (int)edgeMap[(i-0)*dW + (j+0)]; // extend
+    
+    // DOWN LEFT AND DOWN RIGHT
+    if ((j - 1 > 0) && (i + 1) < dH)
+        edge = edge + kern[2][0] * (int)edgeMap[(i+1)*dW + (j-1)]; 
+    else                      
+        edge = edge + kern[2][0] * (int)edgeMap[(i+0)*dW + (j-0)]; // extend
+
+    if ((j + 1 < dW) && (i + 1) < dH)
+        edge = edge + kern[2][2] * (int)edgeMap[(i+1)*dW + (j+1)]; 
+    else                     
+        edge = edge + kern[2][2] * (int)edgeMap[(i+0)*dW + (j+0)]; // extend
+    
+   
+
+    // clamp
+    if (edge < 0)
+        edge = 0;
+    
+    if (edge > 31999)
+        edge = 32002;
+
     return edge;
 
 }
 
-static void findEdges() 
+static void findEdges(const char *kern) 
 {
     memset(edgeResult, 32002, sizeof(edgeResult));
     for(int i=0; i < dH; i++) {
         for(int j=0; j < dW; j++) {
-            edgeResult[i*dW + j] = convolve(i,j, sharpKern);
+            edgeResult[i*dW + j] = convolve(i,j, edgeHighKern);
         }
     }
 }
@@ -816,9 +859,15 @@ static PyObject *getBlob(PyObject *self, PyObject *args)
 
 static PyObject *getEdges(PyObject *self, PyObject *args)
 {
+    const char *kern;
+
+    if (!PyArg_ParseTuple(args, "s", &kern))
+        return NULL;
+
+
     npy_intp dims[2] = {dH, dW};
     memcpy(edgeMap, depthFullMap, dshmsz);
-    findEdges(); 
+    findEdges(kern); 
     memcpy(edgeResultClone, edgeResult, dshmsz);
     return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, edgeResultClone);
 }
