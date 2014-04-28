@@ -28,6 +28,7 @@
 #include <windows.h>
 #endif
 
+
 // C includes
 #include <stdio.h>
 #include <sys/types.h>
@@ -35,11 +36,14 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
 
 // C++ includes
 #include <vector>
 #include <exception>
 #include <iostream>
+#include <list>
+#include<map>
 //#include <thread>
 
 // DepthSense SDK includes
@@ -101,8 +105,34 @@ static float accelMapClone[3];
 static float uvMapClone[320*240*2];
 static uint8_t syncMapClone[320*240*3];
 
-int child_pid = 0;
+// internal maps for blob finding
+static uint16_t blobMap[320*240];
+static uint16_t blobResult[320*240];
+static uint16_t blobResultClone[320*240];
+static uint8_t visited[320][240];
 
+// internal maps for edge finding
+static uint16_t edgeMap[320*240];
+static uint16_t edgeResult[320*240];
+static uint16_t edgeResultClone[320*240];
+
+// kernels
+static int edgeKern[3][3] = { { 0,  1,  0}, 
+                              { 1, -4,  1}, 
+                              { 0,  1,  0} };
+
+static int sharpKern[3][3] = { {  0, -1,  0}, 
+                               { -1,  5, -1}, 
+                               {  0, -1,  0} };
+
+static int ogKern[3][3] = { { 0, 0, 0}, 
+                            { 0, 1, 0}, 
+                            { 0, 0, 0} };
+
+static map<char*, int[3][3]> kernels;
+
+// clean up
+int child_pid = 0;
 // can't write atomic op but i can atleast do a swap
 static void dptrSwap (uint16_t **pa, uint16_t **pb){
         uint16_t *temp = *pa;
@@ -412,16 +442,10 @@ static void onDeviceDisconnected(Context context, Context::DeviceRemovedData dat
 /*                         Data processors                                    */
 /*----------------------------------------------------------------------------*/
 
-/* 
- * the at exit call back. kill the depthsense node process as well as
- * clean up the shared mem regions
- */
 extern "C" {
-    static void killds(){
-        if (child_pid == 0) {
-
-        }
-        if (child_pid !=0)
+    static void killds()
+    {
+        if (child_pid !=0) {
             kill(child_pid, SIGTERM);
             munmap(depthMap, dshmsz);
             munmap(depthFullMap, dshmsz);
@@ -431,72 +455,39 @@ extern "C" {
             munmap(vertexFullMap, vshmsz*3);
             munmap(uvMap, ushmsz*2);
             munmap(uvFullMap, ushmsz*2);
+        }
 
     }
 }
 
-/* 
- * init the shared mem regions and fork the depthsense "turn on nodes" code
- * preparation for the two levels of async callbacks 
- * (one two and from the nodes, the other two and from python method calls)
- */
+static void * initmap(int sz) 
+{
+    void * map;     
+    if ((map = mmap(NULL, sz, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
+        perror("mmap: cannot alloc shmem;");
+        exit(1);
+    }
+
+    return map;
+}
+
 static void initds()
 {
     // shared mem double buffers
-    if ((depthMap = (uint16_t *) mmap(NULL, dshmsz, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
+    depthMap = (uint16_t *) initmap(dshmsz); 
+    depthFullMap = (uint16_t *) initmap(dshmsz); 
 
-    if ((depthFullMap = (uint16_t *) mmap(NULL, dshmsz, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
+    accelMap = (float *) initmap(3*sizeof(float)); 
+    accelFullMap = (float *) initmap(3*sizeof(float)); 
 
-    // shared mem double buffers
-    if ((accelMap = (float *) mmap(NULL, 3*sizeof(float), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
+    colourMap = (uint8_t *) initmap(cshmsz*3); 
+    colourFullMap = (uint8_t *) initmap(cshmsz*3); 
 
-    if ((accelFullMap = (float *) mmap(NULL, 3*sizeof(float), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
-
-    // shared mem double buffers
-    if ((colourMap = (uint8_t *) mmap(NULL, cshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
-
-    if ((colourFullMap = (uint8_t *) mmap(NULL, cshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
-
-    // shared mem double buffers
-    if ((vertexMap = (int16_t *) mmap(NULL, vshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
-
-    if ((vertexFullMap = (int16_t *) mmap(NULL, vshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
-
-    // shared mem double buffers
-    if ((uvMap = (float *) mmap(NULL, ushmsz*2, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
-
-    if ((uvFullMap = (float *) mmap(NULL, ushmsz*2, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
-
+    vertexMap = (int16_t *) initmap(vshmsz*3); 
+    vertexFullMap = (int16_t *) initmap(vshmsz*3); 
+    
+    uvMap = (float *) initmap(ushmsz*2); 
+    uvFullMap = (float *) initmap(ushmsz*2); 
 
     child_pid = fork();
     // child goes into loop
@@ -542,8 +533,8 @@ static void initds()
  * with the resoloution of the depth map with pixels that exist in both the 
  * depth and colour map exclusively (that info is provided by the uv map)
  */
-static void buildSyncMap() {
-
+static void buildSyncMap()
+{
     int ci, cj;
     uint8_t colx;
     uint8_t coly;
@@ -575,10 +566,170 @@ static void buildSyncMap() {
 
         }
     }
+}
 
+static bool checkHood(int p_i, int p_j, int base, double thresh_high, double thresh_low, int * pack)
+{
+
+    int depth = blobMap[p_i*dW + p_j];
+    bool push_val = false;
+    
+    if (visited[p_i][p_j] > 3) {
+        // natta 
+        //blobResult[p_i*dW + p_j] = depth;
+    } else if (visited[p_i][p_j] > 2) {
+        // include the value since the neighbours all match
+        // not sure if i should explore but ...
+        if (!((depth < thresh_high + base) &&
+            (depth > base - thresh_low))) {
+            pack[0] = p_i; pack[1] = p_j; pack[2] = base;
+            push_val = true;
+            blobResult[p_i*dW + p_j] = depth;
+            // fill in
+            //if ((p_i - 1 > 0) && (p_i + 1 < dH) && 
+            //    (p_j - 1 > 0) && (p_j + 1 < dW) &&
+            //    (blobResult[(p_i-1)*dW + p_j] > 0) && 
+            //    (blobResult[(p_i+1)*dW + p_j] > 0) && 
+            //    (blobResult[p_i*dW + (p_j-1)] > 0) && 
+            //    (blobResult[p_i*dW + (p_j+1)] > 0)) { 
+
+            //    blobResult[p_i*dW + p_j] = depth;
+            //}
+        }
+    } else if (visited[p_i][p_j] > 0) {
+        if ((depth < thresh_high + base) &&
+            (depth > base - thresh_low)) {
+            pack[0] = p_i; pack[1] = p_j; pack[2] = depth;
+            push_val = true;
+            blobResult[p_i*dW + p_j] = depth;
+        }
+
+    // init
+    } else if (visited[p_i][p_j] == 0) {
+        if ((depth < thresh_high + base) &&
+            (depth > base - thresh_low)) {
+            pack[0] = p_i; pack[1] = p_j; pack[2] = depth;
+            push_val = true;
+        }
+    }
+
+    return push_val;
 
 }
 
+/* 
+ * Blobs bitch
+ */
+static void findBlob(int sy, int sx, double thresh_high, double thresh_low) 
+{
+
+    list<int *> queue;
+    memset(visited, 0, sizeof(visited));
+    memset(blobResult, 32002, sizeof(blobResult));
+   
+    int *pack = (int *)malloc(sizeof(int) * 3);
+    pack[0] = sy; pack[1] = sx; pack[2] = blobMap[sy*dW + sx];
+
+    // assume it passes the threshold/base requirement, can return here possibly
+    queue.push_back(pack);
+    visited[sy][sx] = 1;
+    blobResult[sy*dW + sx] = blobMap[sy*dW + sx];
+
+    while(!queue.empty()){
+        int * val = queue.front();
+        queue.pop_front();
+        int p_i = val[0];
+        int p_j = val[1];
+        int p_v = val[2];
+
+        // DOWN
+        if (p_i + 1 < dH) {
+            int *dpack = (int *)malloc(sizeof(int) * 3);
+            if (checkHood(p_i + 1, p_j, p_v, thresh_high, thresh_low, dpack))
+                queue.push_back(dpack);
+            else
+                free(dpack);
+
+            visited[p_i + 1][p_j]++;
+        }
+
+
+        // UP
+        if (p_i - 1 > 0) {
+            int *upack = (int *)malloc(sizeof(int) * 3);
+            if (checkHood(p_i - 1, p_j, p_v, thresh_high, thresh_low, upack))
+                queue.push_back(upack);
+            else 
+                free(upack);
+
+            visited[p_i - 1][p_j]++;
+        }
+
+        // LEFT
+        if (p_j - 1 > 0) {
+            int *lpack = (int *)malloc(sizeof(int) * 3);
+            if (checkHood(p_i, p_j - 1, p_v, thresh_high, thresh_low, lpack))
+                queue.push_back(lpack);
+            else
+                free(lpack);
+            
+            visited[p_i][p_j - 1]++;
+       }
+
+        // RIGHT
+        if (p_j + 1 < dW) {
+            int *rpack = (int *)malloc(sizeof(int) * 3);
+            if (checkHood(p_i, p_j + 1, p_v, thresh_high, thresh_low, rpack))
+                queue.push_back(rpack);
+            else
+                free(rpack);
+            
+            visited[p_i][p_j + 1]++;
+        }
+
+        free(val);
+    }
+
+}
+
+static int convolve(int i, int j, int kern[3][3]) {
+    int edge = 0;
+    edge = edge + kern[1][1] * (int)edgeMap[i*dW + j];
+    // UP AND DOWN
+    if (i - 1 > 0)
+        edge = edge + kern[0][1] * (int)edgeMap[(i-1)*dW + j];
+    else
+        edge = edge + kern[0][1] * (int)edgeMap[(i-0)*dW + j]; // extend
+
+    if (i + 1 < dH)
+        edge = edge + kern[2][1] * (int)edgeMap[(i+1)*dW + j];
+    else
+        edge = edge + kern[2][1] * (int)edgeMap[(i+0)*dW + j]; // extend
+
+    // LEFT AND RIGHT
+    if (j - 1 > 0)
+        edge = edge + kern[1][0] * (int)edgeMap[i*dW + (j-1)]; 
+    else                      
+        edge = edge + kern[1][0] * (int)edgeMap[i*dW + (j-0)]; // extend
+
+    if (j + 1 < dW)           
+        edge = edge + kern[1][2] * (int)edgeMap[i*dW + (j+1)]; 
+    else                     
+        edge = edge + kern[1][2] * (int)edgeMap[i*dW + (j+0)]; // extend
+    
+    return edge;
+
+}
+
+static void findEdges() 
+{
+    memset(edgeResult, 32002, sizeof(edgeResult));
+    for(int i=0; i < dH; i++) {
+        for(int j=0; j < dW; j++) {
+            edgeResult[i*dW + j] = convolve(i,j, sharpKern);
+        }
+    }
+}
 /*----------------------------------------------------------------------------*/
 /*                       Python Callbacks                                     */
 /*----------------------------------------------------------------------------*/
@@ -645,17 +796,31 @@ static PyObject *killDepthS(PyObject *self, PyObject *args)
     return Py_None;
 }
 
-/* WORK IN PROGRESS!! */
 static PyObject *getBlob(PyObject *self, PyObject *args)
 {
-    int index;
-    double threshold;
+    int i;
+    int j;
+    double thresh_high;
+    double thresh_low;
 
-    if (!PyArg_ParseTuple(args, "id", &index, &threshold))
+    if (!PyArg_ParseTuple(args, "iidd", &i, &j,  &thresh_high, &thresh_low))
         return NULL;
 
-    index = index + (int)threshold;
-    return Py_BuildValue("i", index);
+    npy_intp dims[2] = {dH, dW};
+
+    memcpy(blobMap, depthFullMap, dshmsz);
+    findBlob(i, j, thresh_high, thresh_low); 
+    memcpy(blobResultClone, blobResult, dshmsz);
+    return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, blobResultClone);
+}
+
+static PyObject *getEdges(PyObject *self, PyObject *args)
+{
+    npy_intp dims[2] = {dH, dW};
+    memcpy(edgeMap, depthFullMap, dshmsz);
+    findEdges(); 
+    memcpy(edgeResultClone, edgeResult, dshmsz);
+    return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, edgeResultClone);
 }
 
 static PyMethodDef DepthSenseMethods[] = {
@@ -670,7 +835,8 @@ static PyMethodDef DepthSenseMethods[] = {
     {"initDepthSense",  initDepthS, METH_VARARGS, "Init DepthSense"},
     {"killDepthSense",  killDepthS, METH_VARARGS, "Kill DepthSense"},
     // PROCESS MAPS
-    {"getBlobAt",  getBlob, METH_VARARGS, "Find blobs in the vertex map at index that are below a certain threshold"},
+    {"getBlobAt",  getBlob, METH_VARARGS, "Find blob at location in the depth map"},
+    {"getEdges",  getEdges, METH_VARARGS, "Find edges in depth map"},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
