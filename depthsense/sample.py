@@ -27,6 +27,6 @@ while True:
     iU = depthsense.getUV()
 
 
-    iV.sideBySide(iS).show()
+    iS.sideBySide(iV).show()
     #iD.sideBySide(iY).show()
 

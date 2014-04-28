@@ -43,6 +43,7 @@
 #include <exception>
 #include <iostream>
 #include <list>
+#include<map>
 //#include <thread>
 
 // DepthSense SDK includes
@@ -114,6 +115,8 @@ static uint8_t visited[320][240];
 static uint16_t edgeMap[320*240];
 static uint16_t edgeResult[320*240];
 static uint16_t edgeResultClone[320*240];
+
+// kernels
 static int edgeKern[3][3] = { { 0,  1,  0}, 
                               { 1, -4,  1}, 
                               { 0,  1,  0} };
@@ -125,10 +128,11 @@ static int sharpKern[3][3] = { {  0, -1,  0},
 static int ogKern[3][3] = { { 0, 0, 0}, 
                             { 0, 1, 0}, 
                             { 0, 0, 0} };
-// lazyness here, will undo
 
+static map<char*, int[3][3]> kernels;
+
+// clean up
 int child_pid = 0;
-
 // can't write atomic op but i can atleast do a swap
 static void dptrSwap (uint16_t **pa, uint16_t **pb){
         uint16_t *temp = *pa;
@@ -439,11 +443,9 @@ static void onDeviceDisconnected(Context context, Context::DeviceRemovedData dat
 /*----------------------------------------------------------------------------*/
 
 extern "C" {
-    static void killds(){
-        if (child_pid == 0) {
-
-        }
-        if (child_pid !=0)
+    static void killds()
+    {
+        if (child_pid !=0) {
             kill(child_pid, SIGTERM);
             munmap(depthMap, dshmsz);
             munmap(depthFullMap, dshmsz);
@@ -453,67 +455,39 @@ extern "C" {
             munmap(vertexFullMap, vshmsz*3);
             munmap(uvMap, ushmsz*2);
             munmap(uvFullMap, ushmsz*2);
+        }
 
     }
+}
+
+static void * initmap(int sz) 
+{
+    void * map;     
+    if ((map = mmap(NULL, sz, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
+        perror("mmap: cannot alloc shmem;");
+        exit(1);
+    }
+
+    return map;
 }
 
 static void initds()
 {
     // shared mem double buffers
-    if ((depthMap = (uint16_t *) mmap(NULL, dshmsz, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
+    depthMap = (uint16_t *) initmap(dshmsz); 
+    depthFullMap = (uint16_t *) initmap(dshmsz); 
 
-    if ((depthFullMap = (uint16_t *) mmap(NULL, dshmsz, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
+    accelMap = (float *) initmap(3*sizeof(float)); 
+    accelFullMap = (float *) initmap(3*sizeof(float)); 
 
-    // shared mem double buffers
-    if ((accelMap = (float *) mmap(NULL, 3*sizeof(float), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
+    colourMap = (uint8_t *) initmap(cshmsz*3); 
+    colourFullMap = (uint8_t *) initmap(cshmsz*3); 
 
-    if ((accelFullMap = (float *) mmap(NULL, 3*sizeof(float), PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
-
-    // shared mem double buffers
-    if ((colourMap = (uint8_t *) mmap(NULL, cshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
-
-    if ((colourFullMap = (uint8_t *) mmap(NULL, cshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
-
-    // shared mem double buffers
-    if ((vertexMap = (int16_t *) mmap(NULL, vshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
-
-    if ((vertexFullMap = (int16_t *) mmap(NULL, vshmsz*3, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
-
-    // shared mem double buffers
-    if ((uvMap = (float *) mmap(NULL, ushmsz*2, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
-
-    if ((uvFullMap = (float *) mmap(NULL, ushmsz*2, PROT_READ|PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) {
-        perror("mmap: cannot alloc shmem;");
-        exit(1);
-    }
-
+    vertexMap = (int16_t *) initmap(vshmsz*3); 
+    vertexFullMap = (int16_t *) initmap(vshmsz*3); 
+    
+    uvMap = (float *) initmap(ushmsz*2); 
+    uvFullMap = (float *) initmap(ushmsz*2); 
 
     child_pid = fork();
     // child goes into loop
@@ -720,28 +694,28 @@ static void findBlob(int sy, int sx, double thresh_high, double thresh_low)
 
 static int convolve(int i, int j, int kern[3][3]) {
     int edge = 0;
-    edge = edge + kern[1][1] * edgeMap[i*dW + j];
+    edge = edge + kern[1][1] * (int)edgeMap[i*dW + j];
     // UP AND DOWN
     if (i - 1 > 0)
-        edge = edge + kern[0][1] * edgeMap[(i-1)*dW + j];
+        edge = edge + kern[0][1] * (int)edgeMap[(i-1)*dW + j];
     else
-        edge = edge + kern[0][1] * edgeMap[(i-0)*dW + j]; // extend
+        edge = edge + kern[0][1] * (int)edgeMap[(i-0)*dW + j]; // extend
 
     if (i + 1 < dH)
-        edge = edge + kern[2][1] * edgeMap[(i+1)*dW + j];
+        edge = edge + kern[2][1] * (int)edgeMap[(i+1)*dW + j];
     else
-        edge = edge + kern[2][1] * edgeMap[(i+0)*dW + j]; // extend
+        edge = edge + kern[2][1] * (int)edgeMap[(i+0)*dW + j]; // extend
 
     // LEFT AND RIGHT
     if (j - 1 > 0)
-        edge = edge + kern[1][0] * edgeMap[i*dW + (j-1)]; 
+        edge = edge + kern[1][0] * (int)edgeMap[i*dW + (j-1)]; 
     else                      
-        edge = edge + kern[1][0] * edgeMap[i*dW + (j-0)]; // extend
+        edge = edge + kern[1][0] * (int)edgeMap[i*dW + (j-0)]; // extend
 
     if (j + 1 < dW)           
-        edge = edge + kern[1][2] * edgeMap[i*dW + (j+1)]; 
+        edge = edge + kern[1][2] * (int)edgeMap[i*dW + (j+1)]; 
     else                     
-        edge = edge + kern[1][2] * edgeMap[i*dW + (j+0)]; // extend
+        edge = edge + kern[1][2] * (int)edgeMap[i*dW + (j+0)]; // extend
     
     return edge;
 
