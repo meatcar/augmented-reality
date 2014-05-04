@@ -837,9 +837,9 @@ static PyObject *getDepthColoured(PyObject *self, PyObject *args)
 
     for(int i=0; i < dH; i++) {
         for(int j=0; j < dW; j++) {
-            depthColouredMap[i*dW*3 + j*3 + 0] = (uint8_t) 8*((depthCMap[i*dW + j] << (16 - 5*1)) >> (16 - 5*1));
-            depthColouredMap[i*dW*3 + j*3 + 1] = (uint8_t) 8*((depthCMap[i*dW + j] << (16 - 5*2)) >> (16 - 5*1));
-            depthColouredMap[i*dW*3 + j*3 + 2] = (uint8_t) 8*((depthCMap[i*dW + j] << (16 - 5*3)) >> (16 - 5*1));
+            depthColouredMap[i*dW*3 + j*3 + 0] = (uint8_t) (((depthCMap[i*dW + j] << (16 - 5*1)) >> (16 - 5)) << 3);
+            depthColouredMap[i*dW*3 + j*3 + 1] = (uint8_t) (((depthCMap[i*dW + j] << (16 - 5*2)) >> (16 - 5)) << 3);
+            depthColouredMap[i*dW*3 + j*3 + 2] = (uint8_t) (((depthCMap[i*dW + j] << (16 - 5*3)) >> (16 - 5)) << 3);
 
         }
     }
