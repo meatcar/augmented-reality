@@ -925,15 +925,12 @@ static PyObject *getEdges(PyObject *self, PyObject *args)
     npy_intp dims[2] = {dH, dW};
     memcpy(edgeMap, depthFullMap, dshmsz);
    
-    //for(int i = 0; i < repeat; i++) {
-    //    findEdges(kern); 
-    //    memcpy(edgeMap, edgeResult, dshmsz);
-    //}
+    for(int i = 0; i < repeat; i++) {
+        findEdges(kern); 
+        memcpy(edgeMap, edgeResult, dshmsz);
+    } 
 
     findEdges(kern);
-    memcpy(edgeMap, edgeResult, dshmsz);
-    findEdges((char*)"edge");
-
 
     memcpy(edgeResultClone, edgeResult, dshmsz);
     return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, edgeResultClone);
