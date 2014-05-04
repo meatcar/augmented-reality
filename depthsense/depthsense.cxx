@@ -76,6 +76,7 @@ int dshmsz = dW*dH*sizeof(uint16_t);
 int cshmsz = cW*cH*sizeof(uint8_t);
 int vshmsz = dW*dH*sizeof(int16_t);
 int ushmsz = dW*dH*sizeof(float);
+int hshmsz = dW*dH*sizeof(uint8_t);
 
 // shared mem depth maps
 static uint16_t *depthMap;
@@ -105,6 +106,11 @@ static float accelMapClone[3];
 static float uvMapClone[320*240*2];
 static uint8_t syncMapClone[320*240*3];
 
+// colouring depth map
+static uint16_t depthCMap[320*240];
+static uint8_t depthColouredMap[320*240*3];
+static uint8_t depthColouredMapClone[320*240*3];
+
 // internal maps for blob finding
 static uint16_t blobMap[320*240];
 static uint16_t blobResult[320*240];
@@ -117,42 +123,46 @@ static uint16_t edgeResult[320*240];
 static uint16_t edgeResultClone[320*240];
 
 // kernels
-static int edgeKern[3][3] = { { 0,  1,  0}, 
-                              { 1, -4,  1}, 
-                              { 0,  1,  0} };
+static int edgeKern[9] = { 0,  1,  0, 
+                           1, -4,  1, 
+                           0,  1,  0 };
 
-static int sharpKern[3][3] = { {  0, -1,  0}, 
-                               { -1,  5, -1}, 
-                               {  0, -1,  0} };
+static int sharpKern[9] = {  0, -1,  0, 
+                            -1,  5, -1, 
+                             0, -1,  0 };
 
-static int ogKern[3][3] = { { 0, 0, 0}, 
-                            { 0, 1, 0}, 
-                            { 0, 0, 0} };
+static int ogKern[9] = { 0, 0, 0, 
+                         0, 1, 0, 
+                         0, 0, 0 };
 
-static int embossKern[3][3] = { { -2, -1,  0}, 
-                                { -1,  1,  1}, 
-                                {  0,  1,  2} };
+static int embossKern[9] = { -2, -1,  0, 
+                             -1,  1,  1, 
+                              0,  1,  2 };
 
-static int edgeHighKern[3][3] = { { -1, -1, -1}, 
-                                  { -1,  8, -1}, 
-                                  { -1, -1, -1} };
+static int edgeHighKern[9] = { -1, -1, -1, 
+                               -1,  8, -1, 
+                               -1, -1, -1 };
 
-static int blurKern[3][3] = { { 1,  2,  1},  // needs to be handled differently
-                              { 2,  4,  2}, 
-                              { 1,  2,  1} };
+static int blurKern[9] = { 1,  2,  1,  // needs to be handled differently
+                           2,  4,  2, 
+                           1,  2,  1 };
 
-static int sobelYKern[3][3] = { { 1, 0, -1}, 
-                                { 2, 0, -2}, 
-                                { 1, 0, -1} };
+static int sobelYKern[9] = { 1, 0, -1, 
+                             2, 0, -2, 
+                             1, 0, -1 };
 
-static int sobelXKern[3][3] = { { -1, 0, 1}, 
-                                { -2, 0, 2}, 
-                                { -1, 0, 1} };
+static int sobelXKern[9] = { -1, 0, 1, 
+                             -2, 0, 2, 
+                             -1, 0, 1 };
 
-static map<char*, int(*const)[3]> kernels;
+static int lapKern[9] = {   1,  -2,   1,  // needs to be handled differently
+                           -2,   4,  -2, 
+                            1,  -2,   1 };
+
 
 // clean up
 int child_pid = 0;
+
 // can't write atomic op but i can atleast do a swap
 static void dptrSwap (uint16_t **pa, uint16_t **pb){
         uint16_t *temp = *pa;
@@ -510,16 +520,8 @@ static void initds()
     uvFullMap = (float *) initmap(ushmsz*2); 
 
     // kerns
-    kernels.insert(make_pair((char*)"edge", edgeKern));
-    kernels.insert(make_pair((char*)"sharp", sharpKern));
-    kernels.insert(make_pair((char*)"identity", ogKern));
-    kernels.insert(make_pair((char*)"blur", blurKern));
-    kernels.insert(make_pair((char*)"sobelX", sobelXKern));
-    kernels.insert(make_pair((char*)"sobelY", sobelYKern));
-    kernels.insert(make_pair((char*)"emboss", embossKern));
-    kernels.insert(make_pair((char*)"edgeH", edgeHighKern));
-    
     child_pid = fork();
+
     // child goes into loop
     if (child_pid == 0) {
         g_context = Context::create("localhost");
@@ -704,55 +706,77 @@ static void findBlob(int sy, int sx, double thresh_high, double thresh_low)
 
 }
 
-static int convolve(int i, int j, int kern[3][3]) {
-    int edge = 0;
-    edge = edge + kern[1][1] * (int)edgeMap[i*dW + j];
+static void pickKern(char* kern, int kernel[9]) {
+
+    if (strncmp(kern, "edge", 4) == 0) 
+        memcpy(kernel, edgeKern, 9*sizeof(int) );
+    if (strncmp(kern, "shrp", 4) == 0) 
+        memcpy(kernel, sharpKern, 9*sizeof(int) );
+    if (strncmp(kern, "iden", 4) == 0) 
+        memcpy(kernel, ogKern, 9*sizeof(int) );
+    if (strncmp(kern, "blur", 4) == 0) 
+        memcpy(kernel, blurKern, 9*sizeof(int) );
+    if (strncmp(kern, "sobx", 4) == 0) 
+        memcpy(kernel, sobelXKern, 9*sizeof(int) );
+    if (strncmp(kern, "soby", 4) == 0) 
+        memcpy(kernel, sobelYKern, 9*sizeof(int) );
+    if (strncmp(kern, "embs", 4) == 0) 
+        memcpy(kernel, embossKern, 9*sizeof(int) );
+    if (strncmp(kern, "edgh", 4) == 0) 
+        memcpy(kernel, edgeHighKern, 9*sizeof(int) );
+    if (strncmp(kern, "lapl", 4) == 0) 
+        memcpy(kernel, lapKern, 9*sizeof(int) );
+}
+
+static int convolve(int i, int j, int kern[9], char *kernel) {
+    int edge = 0; int w = 3;
+    edge = edge + kern[1*w +1] * (int)edgeMap[i*dW + j];
     // UP AND DOWN
     if (i - 1 > 0)
-        edge = edge + kern[0][1] * (int)edgeMap[(i-1)*dW + j];
+        edge = edge + kern[0*w + 1] * (int)edgeMap[(i-1)*dW + j];
     else
-        edge = edge + kern[0][1] * (int)edgeMap[(i-0)*dW + j]; // extend
+        edge = edge + kern[0*w + 1] * (int)edgeMap[(i-0)*dW + j]; // extend
 
     if (i + 1 < dH)
-        edge = edge + kern[2][1] * (int)edgeMap[(i+1)*dW + j];
+        edge = edge + kern[2*w + 1] * (int)edgeMap[(i+1)*dW + j];
     else
-        edge = edge + kern[2][1] * (int)edgeMap[(i+0)*dW + j]; // extend
+        edge = edge + kern[2*w + 1] * (int)edgeMap[(i+0)*dW + j]; // extend
 
     // LEFT AND RIGHT
     if (j - 1 > 0)
-        edge = edge + kern[1][0] * (int)edgeMap[i*dW + (j-1)]; 
-    else                      
-        edge = edge + kern[1][0] * (int)edgeMap[i*dW + (j-0)]; // extend
+        edge = edge + kern[1*w + 0] * (int)edgeMap[i*dW + (j-1)]; 
+    else                    
+        edge = edge + kern[1*w + 0] * (int)edgeMap[i*dW + (j-0)]; // extend
 
-    if (j + 1 < dW)           
-        edge = edge + kern[1][2] * (int)edgeMap[i*dW + (j+1)]; 
-    else                     
-        edge = edge + kern[1][2] * (int)edgeMap[i*dW + (j+0)]; // extend
+    if (j + 1 < dW)         
+        edge = edge + kern[1*w + 2] * (int)edgeMap[i*dW + (j+1)]; 
+    else                    
+        edge = edge + kern[1*w + 2] * (int)edgeMap[i*dW + (j+0)]; // extend
     
     // UP LEFT AND UP RIGHT
     if ((j - 1 > 0) && (i - 1) > 0)
-        edge = edge + kern[0][0] * (int)edgeMap[(i-1)*dW + (j-1)]; 
-    else                      
-        edge = edge + kern[0][0] * (int)edgeMap[(i-0)*dW + (j-0)]; // extend
+        edge = edge + kern[0*w + 0] * (int)edgeMap[(i-1)*dW + (j-1)]; 
+    else                    
+        edge = edge + kern[0*w + 0] * (int)edgeMap[(i-0)*dW + (j-0)]; // extend
 
     if ((j + 1 < dW) && (i - 1) > 0)
-        edge = edge + kern[0][2] * (int)edgeMap[(i-1)*dW + (j+1)]; 
+        edge = edge + kern[0*w + 2] * (int)edgeMap[(i-1)*dW + (j+1)]; 
     else                     
-        edge = edge + kern[0][2] * (int)edgeMap[(i-0)*dW + (j+0)]; // extend
+        edge = edge + kern[0*w + 2] * (int)edgeMap[(i-0)*dW + (j+0)]; // extend
     
     // DOWN LEFT AND DOWN RIGHT
     if ((j - 1 > 0) && (i + 1) < dH)
-        edge = edge + kern[2][0] * (int)edgeMap[(i+1)*dW + (j-1)]; 
+        edge = edge + kern[2*w + 0] * (int)edgeMap[(i+1)*dW + (j-1)]; 
     else                      
-        edge = edge + kern[2][0] * (int)edgeMap[(i+0)*dW + (j-0)]; // extend
+        edge = edge + kern[2*w + 0] * (int)edgeMap[(i+0)*dW + (j-0)]; // extend
 
     if ((j + 1 < dW) && (i + 1) < dH)
-        edge = edge + kern[2][2] * (int)edgeMap[(i+1)*dW + (j+1)]; 
+        edge = edge + kern[2*w + 2] * (int)edgeMap[(i+1)*dW + (j+1)]; 
     else                     
-        edge = edge + kern[2][2] * (int)edgeMap[(i+0)*dW + (j+0)]; // extend
+        edge = edge + kern[2*w + 2] * (int)edgeMap[(i+0)*dW + (j+0)]; // extend
     
-   
 
+    edge = edge/2 + (32000/2);
     // clamp
     if (edge < 0)
         edge = 0;
@@ -760,18 +784,31 @@ static int convolve(int i, int j, int kern[3][3]) {
     if (edge > 31999)
         edge = 32002;
 
+    if (strncmp(kernel, "blur", 4) == 0) 
+        edge = edge/(4+2+2+1+1+1+1);
+
+    //if (strncmp(kernel, "edgh", 4) == 0) {
+    //    if (edge > 1000)
+    //        edge = 31999;
+    //    else
+    //        edge = 0;
+    //} 
+
     return edge;
 
 }
 
-static void findEdges(const char *kern) 
+static void findEdges(char *kern) 
 {
+
+    int kernel[9]; pickKern(kern, kernel);
     memset(edgeResult, 32002, sizeof(edgeResult));
     for(int i=0; i < dH; i++) {
         for(int j=0; j < dW; j++) {
-            edgeResult[i*dW + j] = convolve(i,j, edgeHighKern);
+            edgeResult[i*dW + j] = convolve(i,j, kernel, kern);
         }
     }
+
 }
 /*----------------------------------------------------------------------------*/
 /*                       Python Callbacks                                     */
@@ -790,6 +827,25 @@ static PyObject *getDepth(PyObject *self, PyObject *args)
 
     memcpy(depthMapClone, depthFullMap, dshmsz);
     return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, depthMapClone);
+}
+
+static PyObject *getDepthColoured(PyObject *self, PyObject *args)
+{
+    npy_intp dims[3] = {dH, dW, 3};
+
+    memcpy(depthCMap, depthFullMap, dshmsz);
+
+    for(int i=0; i < dH; i++) {
+        for(int j=0; j < dW; j++) {
+            depthColouredMap[i*dW*3 + j*3 + 0] = (uint8_t) 8*((depthCMap[i*dW + j] << (16 - 5*1)) >> (16 - 5*1));
+            depthColouredMap[i*dW*3 + j*3 + 1] = (uint8_t) 8*((depthCMap[i*dW + j] << (16 - 5*2)) >> (16 - 5*1));
+            depthColouredMap[i*dW*3 + j*3 + 2] = (uint8_t) 8*((depthCMap[i*dW + j] << (16 - 5*3)) >> (16 - 5*1));
+
+        }
+    }
+
+    memcpy(depthColouredMapClone, depthColouredMap, hshmsz*3);
+    return PyArray_SimpleNewFromData(3, dims, NPY_UINT8, depthColouredMapClone);
 }
 
 static PyObject *getAccel(PyObject *self, PyObject *args)
@@ -859,15 +915,26 @@ static PyObject *getBlob(PyObject *self, PyObject *args)
 
 static PyObject *getEdges(PyObject *self, PyObject *args)
 {
-    const char *kern;
+    char *kern;
+    int repeat;
 
-    if (!PyArg_ParseTuple(args, "s", &kern))
+    if (!PyArg_ParseTuple(args, "si", &kern, &repeat))
         return NULL;
 
 
     npy_intp dims[2] = {dH, dW};
     memcpy(edgeMap, depthFullMap, dshmsz);
-    findEdges(kern); 
+   
+    //for(int i = 0; i < repeat; i++) {
+    //    findEdges(kern); 
+    //    memcpy(edgeMap, edgeResult, dshmsz);
+    //}
+
+    findEdges(kern);
+    memcpy(edgeMap, edgeResult, dshmsz);
+    findEdges((char*)"edge");
+
+
     memcpy(edgeResultClone, edgeResult, dshmsz);
     return PyArray_SimpleNewFromData(2, dims, NPY_UINT16, edgeResultClone);
 }
@@ -875,6 +942,7 @@ static PyObject *getEdges(PyObject *self, PyObject *args)
 static PyMethodDef DepthSenseMethods[] = {
     // GET MAPS
     {"getDepthMap",  getDepth, METH_VARARGS, "Get Depth Map"},
+    {"getDepthColouredMap",  getDepthColoured, METH_VARARGS, "Get Depth Coloured Map"},
     {"getColourMap",  getColour, METH_VARARGS, "Get Colour Map"},
     {"getVertices",  getVertex, METH_VARARGS, "Get Vertex Map"},
     {"getUVMap",  getUV, METH_VARARGS, "Get UV Map"},

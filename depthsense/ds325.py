@@ -37,15 +37,15 @@ class DS325:
         return iB.invert()
 
 
-    def getEdges(self, kern):
+    def getEdges(self, kern, rep):
         ''' Return a simple cv compatiable 8bit depth image that contains only 
         the blob found at index i,j with depth values that are at most 
         +thresh_high or at least -thresh_low relative to the depth value at 
         i, j'''
 
-        edge = ds.getEdges(kern)
+        edge = ds.getEdges(kern, rep)
         np.clip(edge, 0, 2**10 - 1, edge)
-        #edge >>=2
+        edge >>=2
         edge = edge.astype(np.uint8)
         iE = Image(edge.transpose())
         return iE.invert()
@@ -55,13 +55,15 @@ class DS325:
         ''' Return the pure 16bit depth map as a numpy array '''
          
         depth = ds.getDepthMap()
+        depth = depth/125
         iD = Image(depth.transpose())
         return iD
 
-    def getEdgesFull(self, kern):
+    def getEdgesFull(self, kern, rep):
         ''' Return a pure numpy array of highlighted edges in the depthmap ''' 
 
-        edge = ds.getEdges(kern)
+        edge = ds.getEdges(kern, rep)
+        edge = edge/125
         iE = Image(edge.transpose())
         return iE
 
@@ -76,6 +78,15 @@ class DS325:
         image = ds.getColourMap()
         image = image[:,:,::-1]
         return Image(image.transpose([1,0,2]))
+
+
+    def getDepthColoured(self):
+        ''' Return a simple cv compatiable 8bit colour image ''' 
+
+        depthc = ds.getDepthColouredMap()
+        #depthc = depthc[:,:,::-1]
+        return Image(depthc.transpose([1,0,2]))
+
 
     def getAcceleration(self):
         ''' Return the current acceleration of the device (x,y,z) measured in 
