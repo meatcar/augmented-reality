@@ -1,0 +1,5 @@
+Camera scene rotation problems might be cause scene gets redrawn each time WHILE
+the camera is moving, factor code to start/stop point cloud updates (i.e factor
+out depthsense vertex/sync reading) 
+
+See how rotations appear after stop
